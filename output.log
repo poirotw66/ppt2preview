@@ -1,0 +1,36 @@
+/Users/cfh00896102/miniconda3/lib/python3.10/site-packages/google/api_core/_python_version_support.py:266: FutureWarning: You are using a Python version (3.10.18) which Google will stop supporting in new releases of google.api_core once it reaches its end of life (2026-10-04). Please upgrade to the latest Python version, or at least Python 3.11, to continue receiving updates for google.api_core past that date.
+  warnings.warn(message, FutureWarning)
+================================================================================
+開始產生簡報解說影片
+================================================================================
+
+Step 1: 解析對話內容檔案...
+✓ 解析完成，共 43 個對話項目
+
+Step 2: 轉換 PDF 為圖片...
+⚠️  投影片圖片已存在，驗證檔案完整性...
+✓ 所有圖片檔案驗證通過，使用現有檔案
+✓ 投影片圖片準備完成，共 10 頁
+
+Step 3: 產生音訊片段...
+⚠️  跳過：音訊檔案已存在，載入現有檔案...
+  載入: page_1_segment_0.mp3... ✓ (73.92秒)
+  載入: page_2_segment_1.mp3... ✓ (57.91秒)
+  載入: page_3_segment_2.mp3... ✓ (52.82秒)
+  載入: page_4_segment_3.mp3... ✓ (54.38秒)
+  載入: page_5_segment_4.mp3... ✓ (48.36秒)
+  載入: page_6_segment_5.mp3... ✓ (48.55秒)
+  載入: page_7_segment_6.mp3... ✓ (49.87秒)
+  載入: page_8_segment_7.mp3... ✓ (45.00秒)
+  載入: page_9_segment_8.mp3... ✓ (41.71秒)
+  載入: page_10_segment_9.mp3... ✓ (44.95秒)
+✓ 載入 10 個現有音訊片段
+Step 4: Creating video clips...
+--------------------------------------------------------------------------------
+準備處理 10 頁投影片...
+[1/10] 正在處理第 1 頁... Traceback (most recent call last):
+  File "/Users/cfh00896102/Github/ppt2preview/test.py", line 450, in <module>
+    create_video(PDF_PATH, TRANSCRIPTION_PATH, OUTPUT_VIDEO)
+  File "/Users/cfh00896102/Github/ppt2preview/test.py", line 379, in create_video
+    sys.stdout.flush()
+NameError: name 'sys' is not defined
