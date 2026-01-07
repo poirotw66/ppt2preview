@@ -115,9 +115,10 @@ def pdf_to_images(pdf_path: str, output_dir: str = "slides") -> List[str]:
     """
     Path(output_dir).mkdir(exist_ok=True)
     
-    # Convert PDF to images with lower DPI for faster processing
-    # 300 DPI is very high, 150 DPI is usually sufficient for video
-    images = convert_from_path(pdf_path, dpi=150)
+    # Convert PDF to images with optimized DPI for video
+    # Lower DPI = faster processing and smaller files
+    # 72 DPI is sufficient for video (standard screen DPI, much faster)
+    images = convert_from_path(pdf_path, dpi=72)
     
     image_paths = []
     for i, image in enumerate(images, start=1):
@@ -387,9 +388,31 @@ def create_video(
         
         print(f"載入圖片...", end=" ", flush=True)
         sys.stdout.flush()
-        # Load image clip
-        # Note: Resizing is skipped to avoid PIL version compatibility issues
-        # The encoding will handle the image size automatically
+        # Load and resize image using PIL for faster encoding
+        # Large images (3000x1688) significantly slow down encoding
+        from PIL import Image as PILImage
+        pil_img = PILImage.open(image_path)
+        original_size = pil_img.size
+        
+        # Resize to max 1920x1080 (1080p for better quality)
+        max_width, max_height = 1920, 1080
+        if original_size[0] > max_width or original_size[1] > max_height:
+            # Calculate scale to fit within max_width x max_height
+            scale = min(max_width / original_size[0], max_height / original_size[1])
+            new_width = int(original_size[0] * scale)
+            new_height = int(original_size[1] * scale)
+            # Ensure dimensions are even (required by H.264 encoder)
+            new_width = new_width if new_width % 2 == 0 else new_width - 1
+            new_height = new_height if new_height % 2 == 0 else new_height - 1
+            new_size = (new_width, new_height)
+            # Use NEAREST resampling for maximum speed (quality is acceptable for video)
+            pil_img = pil_img.resize(new_size, PILImage.Resampling.NEAREST)
+            # Save resized image temporarily with fast compression
+            temp_path = image_path.replace('.png', '_resized.png')
+            pil_img.save(temp_path, 'PNG', optimize=True, compress_level=1)  # Fast compression
+            image_path = temp_path
+            print(f"縮放: {original_size} -> {new_size}...", end=" ", flush=True)
+        
         img_clip = ImageClip(image_path).set_duration(total_duration)
         
         print(f"載入音訊 ({len(page_audios)} 個片段)...", end=" ", flush=True)
@@ -430,21 +453,23 @@ def create_video(
     # The default 'bar' logger already shows progress bars
     logger = 'bar'
     
-    # Write video file with progress bar and optimized settings for speed
+    # Write video file with maximum speed optimizations
     final_video.write_videofile(
         output_video_path,
-        fps=24,
+        fps=5,  # Very low FPS = much faster encoding (5 fps for presentations)
         codec='libx264',
         audio_codec='aac',
         verbose=True,
         logger=logger,
-        preset='ultrafast',  # Use ultrafast preset for maximum speed (sacrifices some quality)
-        bitrate='5000k',  # Set bitrate for faster encoding
-        threads=8,  # Use more threads for faster encoding
+        preset='ultrafast',  # Fastest encoding preset
+        bitrate='2000k',  # Lower bitrate = faster encoding
+        threads=8,  # Use all available CPU cores
         ffmpeg_params=[
-            '-crf', '23',  # Quality setting (23 is good balance)
+            '-crf', '30',  # Higher CRF = faster encoding (30 is acceptable for presentations)
             '-movflags', '+faststart',  # Enable fast start for web playback
-            '-pix_fmt', 'yuv420p'  # Ensure compatibility
+            '-pix_fmt', 'yuv420p',  # Ensure compatibility
+            '-tune', 'fastdecode',  # Optimize for fast decoding
+            '-x264-params', 'keyint=60:min-keyint=60:scenecut=0:no-mbtree=1:no-cabac=1'  # Maximum speed settings
         ]
     )
     print()  # New line after progress bar
