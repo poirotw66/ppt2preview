@@ -1,11 +1,15 @@
 """Background task management system."""
 
 import threading
+import json
+import os
 from typing import Dict, Optional, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from enum import Enum
+from pathlib import Path
 
 from backend.api.models import TaskStatus
+from backend.core.config import TEMP_DIR
 
 
 @dataclass
@@ -27,6 +31,49 @@ class TaskManager:
         self._progress: Dict[str, TaskProgress] = {}
         self._lock = threading.Lock()
         self._progress_callbacks: Dict[str, list] = {}  # task_id -> list of callbacks
+        self._state_file = TEMP_DIR / ".task_manager_state.json"
+        # Load existing tasks from disk
+        self._load_state()
+    
+    def _load_state(self):
+        """Load task state from disk if available."""
+        if self._state_file.exists():
+            try:
+                with open(self._state_file, 'r', encoding='utf-8') as f:
+                    state = json.load(f)
+                    self._tasks = state.get('tasks', {})
+                    # Restore progress
+                    for task_id, progress_data in state.get('progress', {}).items():
+                        self._progress[task_id] = TaskProgress(
+                            status=TaskStatus(progress_data['status']),
+                            progress=progress_data.get('progress', 0.0),
+                            current_step=progress_data.get('current_step'),
+                            message=progress_data.get('message'),
+                            error=progress_data.get('error')
+                        )
+            except Exception as e:
+                print(f"Warning: Failed to load task state: {e}")
+    
+    def _save_state(self):
+        """Save task state to disk."""
+        try:
+            state = {
+                'tasks': self._tasks,
+                'progress': {
+                    task_id: {
+                        'status': progress.status.value,
+                        'progress': progress.progress,
+                        'current_step': progress.current_step,
+                        'message': progress.message,
+                        'error': progress.error
+                    }
+                    for task_id, progress in self._progress.items()
+                }
+            }
+            with open(self._state_file, 'w', encoding='utf-8') as f:
+                json.dump(state, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            print(f"Warning: Failed to save task state: {e}")
     
     def create_task(self, task_id: str, task_info: Dict):
         """Create a new task.
@@ -41,6 +88,7 @@ class TaskManager:
                 status=TaskStatus.PENDING,
                 progress=0.0
             )
+            self._save_state()
     
     def task_exists(self, task_id: str) -> bool:
         """Check if task exists.
@@ -52,7 +100,16 @@ class TaskManager:
             True if task exists
         """
         with self._lock:
-            return task_id in self._tasks
+            # Check memory first
+            if task_id in self._tasks:
+                return True
+            # Check disk
+            task_dir = TEMP_DIR / task_id
+            if task_dir.exists():
+                # Try to restore
+                self._load_state()
+                return task_id in self._tasks
+            return False
     
     def get_task_info(self, task_id: str) -> Dict:
         """Get task information.
@@ -79,6 +136,7 @@ class TaskManager:
             if task_id not in self._tasks:
                 raise ValueError(f"Task {task_id} not found")
             self._tasks[task_id].update(updates)
+            self._save_state()
     
     def add_progress_callback(self, task_id: str, callback: Callable[[TaskProgress], None]):
         """Add a progress callback for a task.
@@ -132,6 +190,9 @@ class TaskManager:
             
             if error is not None:
                 progress_obj.error = error
+            
+            # Save state after update
+            self._save_state()
         
         # Call progress callbacks
         if task_id in self._progress_callbacks:
@@ -151,8 +212,15 @@ class TaskManager:
             Task progress object
         """
         with self._lock:
+            # Try to restore from disk if not in memory
             if task_id not in self._progress:
-                raise ValueError(f"Task {task_id} not found")
+                # Check if task directory exists
+                task_dir = TEMP_DIR / task_id
+                if task_dir.exists():
+                    # Try to restore task
+                    self._load_state()
+                    if task_id not in self._progress:
+                        raise ValueError(f"Task {task_id} not found")
             return self._progress[task_id]
     
     def delete_task(self, task_id: str):

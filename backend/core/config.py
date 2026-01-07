@@ -20,7 +20,7 @@ API_V1_PREFIX = "/api/v1"
 
 # Gemini Configuration
 GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL = "gemini-2.0-flash-exp"  # Using Gemini 3 Flash equivalent
+GEMINI_MODEL = "gemini-2.0-flash"  # Using Gemini 3 Flash equivalent
 
 # Google Cloud TTS Configuration
 GOOGLE_CLOUD_PROJECT = os.getenv("GOOGLE_CLOUD_PROJECT")

@@ -1,0 +1,124 @@
+.navigation {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  padding: 1.5rem 2rem;
+  border-radius: 12px;
+  margin-bottom: 2rem;
+}
+
+.nav-steps {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.nav-step-container {
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.nav-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  color: white;
+  transition: all 0.3s ease;
+  padding: 0.5rem;
+  border-radius: 8px;
+  flex: 1;
+}
+
+.nav-step:hover:not(.disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-2px);
+}
+
+.nav-step.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.step-number {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+  transition: all 0.3s ease;
+}
+
+.nav-step.pending .step-number {
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.nav-step.active .step-number {
+  background: white;
+  color: #667eea;
+  border: 2px solid white;
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.3);
+  transform: scale(1.1);
+}
+
+.nav-step.completed .step-number {
+  background: #28a745;
+  color: white;
+  border: 2px solid #28a745;
+}
+
+.step-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.nav-step.active .step-label {
+  font-weight: 700;
+}
+
+.step-connector {
+  flex: 1;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 0 1rem;
+  transition: all 0.3s ease;
+}
+
+.step-connector.completed {
+  background: #28a745;
+}
+
+@media (max-width: 768px) {
+  .navigation {
+    padding: 1rem;
+  }
+
+  .nav-steps {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .nav-step-container {
+    width: 100%;
+    flex-direction: row;
+  }
+
+  .step-connector {
+    width: 2px;
+    height: 40px;
+    margin: 0.5rem 0;
+  }
+
+  .step-label {
+    font-size: 0.8rem;
+  }
+}
+

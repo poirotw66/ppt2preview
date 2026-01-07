@@ -75,8 +75,73 @@ class FileService:
             Path to output file
         """
         output_task_dir = OUTPUT_DIR / task_id
-        output_task_dir.mkdir(exist_ok=True)
+        output_task_dir.mkdir(exist_ok=True, parents=True)
         return output_task_dir / filename
+    
+    @staticmethod
+    def get_output_task_directory(task_id: str) -> Path:
+        """Get output directory for a task.
+        
+        Args:
+            task_id: Task identifier
+            
+        Returns:
+            Path to output task directory
+        """
+        output_task_dir = OUTPUT_DIR / task_id
+        output_task_dir.mkdir(exist_ok=True, parents=True)
+        return output_task_dir
+    
+    @staticmethod
+    def save_output_file(task_id: str, filename: str, content: str, encoding: str = 'utf-8') -> Path:
+        """Save content to output file.
+        
+        Args:
+            task_id: Task identifier
+            filename: Filename
+            content: File content
+            encoding: File encoding (default: utf-8)
+            
+        Returns:
+            Path to saved file
+        """
+        output_path = FileService.get_output_file_path(task_id, filename)
+        with open(output_path, 'w', encoding=encoding) as f:
+            f.write(content)
+        return output_path
+    
+    @staticmethod
+    def get_output_file_content(task_id: str, filename: str, encoding: str = 'utf-8') -> str:
+        """Read content from output file.
+        
+        Args:
+            task_id: Task identifier
+            filename: Filename
+            encoding: File encoding (default: utf-8)
+            
+        Returns:
+            File content
+        """
+        output_path = FileService.get_output_file_path(task_id, filename)
+        if not output_path.exists():
+            raise FileNotFoundError(f"Output file not found: {output_path}")
+        with open(output_path, 'r', encoding=encoding) as f:
+            return f.read()
+    
+    @staticmethod
+    def list_output_files(task_id: str) -> list[str]:
+        """List all files in output directory for a task.
+        
+        Args:
+            task_id: Task identifier
+            
+        Returns:
+            List of filenames
+        """
+        output_task_dir = FileService.get_output_task_directory(task_id)
+        if not output_task_dir.exists():
+            return []
+        return [f.name for f in output_task_dir.iterdir() if f.is_file()]
     
     @staticmethod
     def cleanup_task(task_id: str, keep_output: bool = False):

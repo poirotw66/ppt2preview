@@ -1,10 +1,15 @@
 """FastAPI main application entry point."""
 
 import uuid
+import warnings
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+
+# Suppress FutureWarning globally before any imports
+warnings.filterwarnings('ignore', category=FutureWarning)
+warnings.filterwarnings('ignore', message='.*google.generativeai.*')
 
 from backend.api.routes import router
 from backend.core.config import API_V1_PREFIX

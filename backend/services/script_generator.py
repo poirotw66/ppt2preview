@@ -43,15 +43,12 @@ class ScriptGenerator:
             length_mode=length_mode
         )
         
-        # Save script to task directory
-        script_path = FileService.get_task_file_path(task_id, "script.md")
-        with open(script_path, 'w', encoding='utf-8') as f:
-            f.write(script_content)
+        # Save script to output directory only
+        script_path = FileService.save_output_file(task_id, "script.md", script_content)
         
-        # Save transcription to task directory
-        transcription_path = FileService.get_task_file_path(task_id, "transcription.py")
-        with open(transcription_path, 'w', encoding='utf-8') as f:
-            f.write(str(transcription_data))
+        # Save transcription to output directory only
+        transcription_content = str(transcription_data)
+        transcription_path = FileService.save_output_file(task_id, "transcription.py", transcription_content)
         
         return script_content, transcription_data
 

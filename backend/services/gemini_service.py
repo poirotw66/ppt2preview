@@ -2,17 +2,33 @@
 
 import os
 import json
+import warnings
 from typing import Optional, List, Tuple
 from pathlib import Path
 
+# Suppress FutureWarning for deprecated google.generativeai
+# Must be set before importing google.generativeai
+# Note: google.generativeai is deprecated but still functional
+# TODO: Migrate to google.genai when stable version is available
+warnings.filterwarnings('ignore', category=FutureWarning)
+warnings.filterwarnings('ignore', message='.*google.generativeai.*')
+
 try:
-    import google.generativeai as genai
-    GEMINI_AVAILABLE = True
+    # Try new API first (for future compatibility)
+    try:
+        import google.genai as genai
+        GEMINI_AVAILABLE = True
+        USE_NEW_API = True
+    except ImportError:
+        # Fall back to deprecated but working API
+        import google.generativeai as genai
+        GEMINI_AVAILABLE = True
+        USE_NEW_API = False
 except ImportError:
     GEMINI_AVAILABLE = False
+    USE_NEW_API = False
 
 import sys
-from pathlib import Path
 
 # Add project root to path for prompt import
 project_root = Path(__file__).parent.parent.parent
@@ -28,13 +44,49 @@ class GeminiService:
     def __init__(self):
         """Initialize Gemini service."""
         if not GEMINI_AVAILABLE:
-            raise ImportError("google-generativeai package is not installed")
+            raise ImportError(
+                "google-generativeai package is not installed. "
+                "Please install it with: pip install google-generativeai"
+            )
         
         if not GEMINI_API_KEY:
-            raise ValueError("GEMINI_API_KEY environment variable is not set")
+            raise ValueError(
+                "GEMINI_API_KEY environment variable is not set. "
+                "Please set it in your .env file or environment variables."
+            )
         
-        genai.configure(api_key=GEMINI_API_KEY)
-        self.model = genai.GenerativeModel(GEMINI_MODEL)
+        try:
+            # Configure API key (works for both old and new API)
+            if USE_NEW_API and hasattr(genai, 'Client'):
+                # New API: google.genai
+                self.client = genai.Client(api_key=GEMINI_API_KEY)
+                self.model = self.client.models.get(GEMINI_MODEL)
+                self._use_new_api = True
+            elif hasattr(genai, 'configure'):
+                # Old API: google.generativeai (deprecated but working)
+                genai.configure(api_key=GEMINI_API_KEY)
+                self.model = genai.GenerativeModel(GEMINI_MODEL)
+                self._use_new_api = False
+            else:
+                raise RuntimeError("Unsupported genai API version")
+        except Exception as e:
+            raise RuntimeError(f"Failed to initialize Gemini service: {e}") from e
+    
+    def _get_response_text(self, response) -> str:
+        """Extract text from response (compatible with both APIs)."""
+        if hasattr(response, 'text') and response.text:
+            return response.text
+        elif hasattr(response, 'content') and response.content:
+            # New API format
+            return response.content
+        elif hasattr(response, 'candidates') and response.candidates:
+            # Alternative response format
+            candidate = response.candidates[0]
+            if hasattr(candidate, 'content'):
+                parts = candidate.content.parts
+                if parts:
+                    return parts[0].text
+        return None
     
     def generate_script(
         self,
@@ -71,10 +123,12 @@ class GeminiService:
         # Generate script
         response = self.model.generate_content(full_prompt)
         
-        if not response.text:
-            raise ValueError("Failed to generate script from Gemini")
+        # Extract text from response
+        response_text = self._get_response_text(response)
+        if not response_text:
+            raise ValueError("Failed to generate script from Gemini: Empty response")
         
-        return response.text
+        return response_text
     
     def rewrite_transcript(self, script_content: str) -> List[Tuple[str, str]]:
         """Rewrite script to transcription format using Gemini.
@@ -99,13 +153,15 @@ class GeminiService:
         
         response = self.model.generate_content(prompt)
         
-        if not response.text:
-            raise ValueError("Failed to rewrite transcript from Gemini")
+        # Extract text from response
+        response_text = self._get_response_text(response)
+        if not response_text:
+            raise ValueError("Failed to rewrite transcript from Gemini: Empty response")
         
         # Parse the response - it should be a Python list
         try:
             # Extract Python list from response
-            transcript_text = response.text.strip()
+            transcript_text = response_text.strip()
             
             # Remove markdown code blocks if present
             if transcript_text.startswith("```python"):
@@ -138,6 +194,46 @@ class GeminiService:
         except Exception as e:
             raise ValueError(f"Failed to parse transcript: {e}")
     
+    def optimize_script(self, script_content: str) -> Tuple[str, List[Tuple[str, str]]]:
+        """Optimize existing script using TRANSCRIPT_REWRITER_PROMPT.
+        
+        This method takes an existing script and optimizes it using the
+        transcript rewriter prompt, which adds TTS markers and improves
+        the script for better speech synthesis.
+        
+        Args:
+            script_content: Original script content to optimize
+            
+        Returns:
+            Tuple of (optimized_script_content, transcription_data)
+        """
+        # Use rewrite_transcript to optimize the script
+        transcription_data = self.rewrite_transcript(script_content)
+        
+        # Convert transcription back to script format
+        # Group by page and convert to script format
+        optimized_script_parts = []
+        current_page = None
+        
+        for speaker, text in transcription_data:
+            if speaker == "頁碼":
+                # Extract page number from text like "[PAGE 1]"
+                import re
+                page_match = re.search(r'PAGE\s+(\d+)', text)
+                if page_match:
+                    page_num = int(page_match.group(1))
+                    if current_page is not None:
+                        optimized_script_parts.append("")  # Add blank line between pages
+                    optimized_script_parts.append(f"### [PAGE {page_num}]")
+                    current_page = page_num
+            else:
+                # Add dialogue text
+                optimized_script_parts.append(text)
+        
+        optimized_script_content = "\n\n".join(optimized_script_parts)
+        
+        return optimized_script_content, transcription_data
+    
     def generate_complete_transcript(
         self,
         abstract_content: str,
@@ -161,4 +257,3 @@ class GeminiService:
         transcription_data = self.rewrite_transcript(script_content)
         
         return script_content, transcription_data
-
