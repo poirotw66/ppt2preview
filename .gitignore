@@ -9,3 +9,11 @@ __pycache__/
 *.pyzw
 *.pyzwz 
 audio_segments/
+slides/
+*.mp4
+*.mp3
+*.log
+output.log
+TEMP_MPY_*
+*.DS_Store
+.env
