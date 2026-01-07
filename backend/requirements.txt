@@ -1,0 +1,24 @@
+# Backend Dependencies
+
+# FastAPI and web server
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# Pydantic for data validation
+pydantic==2.5.0
+
+# Google Cloud services
+google-cloud-texttospeech==2.29.0
+google-generativeai==0.3.2
+
+# PDF and image processing
+pdf2image==1.16.3
+Pillow==10.1.0
+
+# Video processing
+moviepy==1.0.3
+
+# Utilities
+python-dotenv==1.0.0
+
