@@ -131,24 +131,26 @@ def synthesize_speech(
     prompt: str, 
     text: str, 
     output_filepath: str,
-    language_code: str = "cmn-tw"
+    language_code: str = "cmn-tw",
+    max_retries: int = 3
 ) -> str:
     """Synthesizes speech from the input text and saves it to an MP3 file.
     
     Google Cloud TTS has a limit of 4000 bytes for input.text + input.prompt combined.
     This function automatically splits long text into multiple chunks if needed.
+    Includes automatic retry with exponential backoff for network errors.
     
     Args:
         prompt: Styling instructions on how to synthesize the content in the text field.
         text: The text to synthesize.
         output_filepath: The path to save the generated audio file.
         language_code: Language code (default: cmn-tw for Traditional Chinese)
+        max_retries: Maximum number of retry attempts (default: 3)
         
     Returns:
         Path to generated audio file
     """
-    # Get shared TTS client (reuses connection across threads)
-    client = _get_tts_client()
+    from google.api_core import exceptions as google_exceptions
     
     # Check total size (prompt + text)
     prompt_bytes = len(prompt.encode('utf-8'))
@@ -171,7 +173,7 @@ def synthesize_speech(
             chunk_path = f"{base_path}_chunk_{idx}.{extension}"
             # Recursively call synthesize_speech for each chunk (without prompt after first chunk)
             chunk_prompt = prompt if idx == 0 else ""  # Only use prompt for first chunk
-            synthesize_speech(chunk_prompt, chunk, chunk_path, language_code)
+            synthesize_speech(chunk_prompt, chunk, chunk_path, language_code, max_retries)
             audio_files.append(chunk_path)
         
         # Concatenate audio files
@@ -201,31 +203,69 @@ def synthesize_speech(
         return output_filepath
     
     # Normal case: text fits within limit
-    # Create synthesis input with text and prompt
-    synthesis_input = texttospeech.SynthesisInput(text=text, prompt=prompt)
+    # Retry loop with exponential backoff
+    last_exception = None
+    for attempt in range(max_retries):
+        try:
+            # Get shared TTS client (reuses connection across threads)
+            client = _get_tts_client()
+            
+            # Create synthesis input with text and prompt
+            synthesis_input = texttospeech.SynthesisInput(text=text, prompt=prompt)
+            
+            # Select the voice - using Gemini TTS model
+            voice = texttospeech.VoiceSelectionParams(
+                language_code=language_code,
+                name="Charon",
+                model_name="gemini-2.5-flash-tts"  # Using flash model for faster generation
+            )
+            
+            # Configure audio output
+            audio_config = texttospeech.AudioConfig(
+                audio_encoding=texttospeech.AudioEncoding.MP3
+            )
+            
+            # Perform the text-to-speech request with timeout
+            response = client.synthesize_speech(
+                input=synthesis_input,
+                voice=voice,
+                audio_config=audio_config,
+                timeout=120.0  # 2 minutes timeout
+            )
+            
+            # Write the response's audio_content to file
+            with open(output_filepath, "wb") as out:
+                out.write(response.audio_content)
+            
+            # Success - return immediately
+            return output_filepath
+            
+        except (google_exceptions.Unknown, 
+                google_exceptions.DeadlineExceeded, 
+                google_exceptions.ServiceUnavailable,
+                google_exceptions.InternalServerError) as e:
+            last_exception = e
+            if attempt < max_retries - 1:
+                # Exponential backoff: 2s, 4s, 6s
+                wait_time = (attempt + 1) * 2
+                print(f"[TTS RETRY] Attempt {attempt + 1}/{max_retries} failed: {str(e)[:100]}")
+                print(f"[TTS RETRY] Retrying in {wait_time}s...")
+                time.sleep(wait_time)
+                
+                # Reset client on connection errors to get fresh connection
+                global _tts_client
+                _tts_client = None
+            else:
+                print(f"[TTS ERROR] All {max_retries} attempts failed for: {output_filepath}")
+                raise
+        except Exception as e:
+            # For other exceptions, don't retry
+            print(f"[TTS ERROR] Unexpected error (no retry): {e}")
+            raise
     
-    # Select the voice - using Gemini TTS model
-    voice = texttospeech.VoiceSelectionParams(
-        language_code=language_code,
-        name="Charon",
-        model_name="gemini-2.5-flash-tts"  # Using flash model for faster generation
-    )
-    
-    # Configure audio output
-    audio_config = texttospeech.AudioConfig(
-        audio_encoding=texttospeech.AudioEncoding.MP3
-    )
-    
-    # Perform the text-to-speech request
-    response = client.synthesize_speech(
-        input=synthesis_input,
-        voice=voice,
-        audio_config=audio_config
-    )
-    
-    # Write the response's audio_content to file
-    with open(output_filepath, "wb") as out:
-        out.write(response.audio_content)
+    # If we get here, all retries failed
+    if last_exception:
+        raise last_exception
     
     return output_filepath
 
