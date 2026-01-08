@@ -91,7 +91,7 @@ function Navigation() {
               >
                 <div className="step-number">
                   {stepStatus === 'completed' ? (
-                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ width: '24px', height: '24px', strokeWidth: 3 }}>
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ width: '28px', height: '28px', strokeWidth: 3.5 }}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                     </svg>
                   ) : (
