@@ -100,9 +100,6 @@ function Navigation() {
                 </div>
                 <div className="step-label">{step.label}</div>
               </Link>
-              {index < steps.length - 1 && (
-                <div className={`step-connector ${stepStatus === 'completed' ? 'completed' : ''}`} />
-              )}
             </div>
           );
         })}

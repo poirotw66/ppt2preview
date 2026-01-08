@@ -269,3 +269,39 @@
   cursor: not-allowed;
 }
 
+/* Responsive Design */
+@media (max-width: 768px) {
+  .progress-tracker {
+    gap: var(--spacing-lg);
+  }
+
+  .progress-header h3 {
+    font-size: 1.25rem;
+  }
+
+  .progress-percentage {
+    font-size: 1.5rem;
+  }
+
+  .video-params-form {
+    grid-template-columns: 1fr;
+  }
+
+  .start-button,
+  .retry-button {
+    padding: var(--spacing-md) var(--spacing-lg);
+  }
+}
+
+@media (max-width: 480px) {
+  .progress-bar-container {
+    height: 24px;
+  }
+
+  .current-step,
+  .status-message,
+  .error-section {
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: 0.875rem;
+  }
+}
