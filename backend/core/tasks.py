@@ -9,7 +9,7 @@ from enum import Enum
 from pathlib import Path
 
 from backend.api.models import TaskStatus
-from backend.core.config import TEMP_DIR
+from backend.core.config import OUTPUT_DIR
 
 
 @dataclass
@@ -31,7 +31,7 @@ class TaskManager:
         self._progress: Dict[str, TaskProgress] = {}
         self._lock = threading.Lock()
         self._progress_callbacks: Dict[str, list] = {}  # task_id -> list of callbacks
-        self._state_file = TEMP_DIR / ".task_manager_state.json"
+        self._state_file = OUTPUT_DIR / ".task_manager_state.json"
         # Load existing tasks from disk
         self._load_state()
     
@@ -104,7 +104,7 @@ class TaskManager:
             if task_id in self._tasks:
                 return True
             # Check disk
-            task_dir = TEMP_DIR / task_id
+            task_dir = OUTPUT_DIR / task_id
             if task_dir.exists():
                 # Try to restore
                 self._load_state()
@@ -215,7 +215,7 @@ class TaskManager:
             # Try to restore from disk if not in memory
             if task_id not in self._progress:
                 # Check if task directory exists
-                task_dir = TEMP_DIR / task_id
+                task_dir = OUTPUT_DIR / task_id
                 if task_dir.exists():
                     # Try to restore task
                     self._load_state()

@@ -28,25 +28,32 @@ function TaskRouteWrapper({ children }: { children: React.ReactNode }) {
       setTaskId(taskId);
 
       // If the store already has this taskId and data, no need to reload
-      if (storeTaskId === taskId && useTaskStore.getState().scriptContent) {
+      const currentState = useTaskStore.getState();
+      if (storeTaskId === taskId && currentState.scriptContent && currentState.status) {
         setLoading(false);
         return;
       }
 
       try {
-        // Fetch task status
-        const statusResponse = await apiClient.getTaskStatus(taskId);
-        updateStatus(statusResponse);
+        // Fetch task status and script in parallel for better performance
+        const [statusResponse, scriptResponse] = await Promise.allSettled([
+          apiClient.getTaskStatus(taskId),
+          apiClient.getScript(taskId)
+        ]);
 
-        // If script is ready, fetch script content
-        if (statusResponse.status === 'script_ready' || statusResponse.status === 'generating_video' || statusResponse.status === 'completed') {
-          try {
-            const scriptResponse = await apiClient.getScript(taskId);
-            setScript(scriptResponse);
-          } catch (err) {
-            console.error('Failed to load script:', err);
-            // Script might not exist yet, that's okay
-          }
+        // Update status
+        if (statusResponse.status === 'fulfilled') {
+          updateStatus(statusResponse.value);
+        } else {
+          console.error('Failed to load status:', statusResponse.reason);
+        }
+
+        // Update script if available
+        if (scriptResponse.status === 'fulfilled') {
+          setScript(scriptResponse.value);
+        } else {
+          console.log('Script not available yet:', scriptResponse.reason);
+          // Script might not exist yet, that's okay
         }
 
         setLoading(false);

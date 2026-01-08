@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Tuple, Optional
 from fastapi import UploadFile
 
-from backend.core.config import UPLOAD_DIR, TEMP_DIR, OUTPUT_DIR
+from backend.core.config import UPLOAD_DIR, OUTPUT_DIR
 
 
 class FileService:
@@ -23,7 +23,7 @@ class FileService:
         Returns:
             Path to task directory
         """
-        task_dir = TEMP_DIR / task_id
+        task_dir = OUTPUT_DIR / task_id
         task_dir.mkdir(exist_ok=True)
         return task_dir
     
@@ -60,7 +60,7 @@ class FileService:
         Returns:
             Path to file
         """
-        task_dir = TEMP_DIR / task_id
+        task_dir = OUTPUT_DIR / task_id
         return task_dir / filename
     
     @staticmethod

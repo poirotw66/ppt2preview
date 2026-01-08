@@ -158,44 +158,51 @@ class VideoGenerator:
                         page_audios = page_audio_map[page_num]
                         total_duration = sum(duration for _, duration in page_audios)
                         
-                        # Load and resize image
+                        # Load and resize image to match target resolution
                         pil_img = PILImage.open(image_path)
                         original_size = pil_img.size
                         
                         max_width, max_height = resolution
-                        needs_resize = False
                         
-                        # Calculate target size
-                        if original_size[0] > max_width or original_size[1] > max_height:
-                            # Need to scale down
-                            scale = min(max_width / original_size[0], max_height / original_size[1])
-                            new_width = int(original_size[0] * scale)
-                            new_height = int(original_size[1] * scale)
-                            needs_resize = True
-                        else:
-                            # No scaling needed, but still check dimensions
-                            new_width = original_size[0]
-                            new_height = original_size[1]
+                        # Calculate scale to fit the target resolution while maintaining aspect ratio
+                        scale_width = max_width / original_size[0]
+                        scale_height = max_height / original_size[1]
+                        
+                        # Use the smaller scale to ensure image fits within target resolution
+                        scale = min(scale_width, scale_height)
+                        
+                        # Calculate new dimensions
+                        new_width = int(original_size[0] * scale)
+                        new_height = int(original_size[1] * scale)
                         
                         # Ensure dimensions are even (required by H.264 encoder)
-                        if new_width % 2 != 0:
-                            new_width = new_width - 1
-                            needs_resize = True
-                        if new_height % 2 != 0:
-                            new_height = new_height - 1
-                            needs_resize = True
+                        new_width = new_width if new_width % 2 == 0 else new_width - 1
+                        new_height = new_height if new_height % 2 == 0 else new_height - 1
                         
-                        # Resize if needed
-                        if needs_resize:
-                            new_size = (new_width, new_height)
-                            pil_img = pil_img.resize(new_size, PILImage.Resampling.NEAREST)
-                            
-                            # Save resized image to output directory
-                            resized_name = f"page_{page_num}_resized.png"
-                            resized_path = output_slides_dir / resized_name
-                            pil_img.save(str(resized_path), 'PNG', optimize=True, compress_level=1)
-                            image_path = str(resized_path)
-                            self._log(f"  圖片調整: {original_size} -> {new_size} (確保尺寸為偶數)")
+                        # Resize image
+                        new_size = (new_width, new_height)
+                        # Use LANCZOS for better quality when scaling
+                        pil_img = pil_img.resize(new_size, PILImage.Resampling.LANCZOS)
+                        
+                        # If image doesn't match target resolution, create a canvas and center the image
+                        if (new_width, new_height) != (max_width, max_height):
+                            # Create a black canvas with target resolution
+                            canvas = PILImage.new('RGB', (max_width, max_height), (0, 0, 0))
+                            # Calculate position to center the image
+                            x_offset = (max_width - new_width) // 2
+                            y_offset = (max_height - new_height) // 2
+                            # Paste the resized image onto the canvas
+                            canvas.paste(pil_img, (x_offset, y_offset))
+                            pil_img = canvas
+                            self._log(f"  圖片調整: {original_size} -> {new_size} -> {(max_width, max_height)} (居中)")
+                        else:
+                            self._log(f"  圖片調整: {original_size} -> {new_size}")
+                        
+                        # Save the final image
+                        resized_name = f"page_{page_num}_resized.png"
+                        resized_path = output_slides_dir / resized_name
+                        pil_img.save(str(resized_path), 'PNG', optimize=True, compress_level=1)
+                        image_path = str(resized_path)
                         
                         img_clip = ImageClip(image_path).set_duration(total_duration)
                         

@@ -16,7 +16,7 @@
 - ✓ Main app
 
 ### 配置檢查
-- ✓ 所有目錄已創建（uploads, output, temp）
+- ✓ 所有目錄已創建（uploads, output）
 - ✓ API 前綴配置正確：`/api/v1`
 - ⚠️  GEMINI_API_KEY 未設置（需要設置才能生成腳本）
 

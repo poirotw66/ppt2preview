@@ -8,12 +8,10 @@ from typing import Optional
 BASE_DIR = Path(__file__).parent.parent.parent
 UPLOAD_DIR = BASE_DIR / "uploads"
 OUTPUT_DIR = BASE_DIR / "output"
-TEMP_DIR = BASE_DIR / "temp"
 
 # Create directories if they don't exist
 UPLOAD_DIR.mkdir(exist_ok=True)
 OUTPUT_DIR.mkdir(exist_ok=True)
-TEMP_DIR.mkdir(exist_ok=True)
 
 # API Configuration
 API_V1_PREFIX = "/api/v1"

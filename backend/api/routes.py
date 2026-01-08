@@ -397,85 +397,6 @@ async def optimize_script(task_id: str, background_tasks: BackgroundTasks):
     )
 
 
-@router.post("/optimize-script/{task_id}", response_model=ScriptResponse)
-async def optimize_script(task_id: str, background_tasks: BackgroundTasks):
-    """Optimize script using TRANSCRIPT_REWRITER_PROMPT.
-    
-    This endpoint reads the current script and optimizes it using
-    Gemini's transcript rewriter prompt, which adds TTS markers and
-    improves the script for better speech synthesis.
-    
-    Args:
-        task_id: Task identifier
-        background_tasks: FastAPI background tasks
-        
-    Returns:
-        Optimized script response
-    """
-    if not task_manager.task_exists(task_id):
-        raise HTTPException(status_code=404, detail="Task not found")
-    
-    # Get current script
-    try:
-        script_content = FileService.get_output_file_content(task_id, "script.md")
-    except FileNotFoundError:
-        task_info = task_manager.get_task_info(task_id)
-        script_content = task_info.get("script_content")
-        if not script_content:
-            raise HTTPException(status_code=404, detail="Script not found")
-    
-    # Update status
-    await update_status_and_notify(
-        task_id,
-        TaskStatus.GENERATING_SCRIPT,
-        40.0,
-        "Optimizing script..."
-    )
-    
-    # Optimize script in background
-    async def optimize_script_task():
-        try:
-            from backend.services.gemini_service import GeminiService
-            gemini_service = GeminiService()
-            
-            optimized_script, transcription_data = gemini_service.optimize_script(script_content)
-            
-            # Save optimized script and transcription
-            FileService.save_output_file(task_id, "script.md", optimized_script)
-            transcription_content = str(transcription_data)
-            FileService.save_output_file(task_id, "transcription.py", transcription_content)
-            
-            # Update task info
-            task_manager.update_task_info(task_id, {
-                "script_content": optimized_script,
-                "transcription_data": transcription_data
-            })
-            
-            await update_status_and_notify(
-                task_id,
-                TaskStatus.SCRIPT_READY,
-                50.0,
-                "Script optimized successfully"
-            )
-        except Exception as e:
-            await update_status_and_notify(
-                task_id,
-                TaskStatus.FAILED,
-                0.0,
-                f"Script optimization failed: {str(e)}",
-                error=str(e)
-            )
-    
-    background_tasks.add_task(optimize_script_task)
-    
-    # Return immediate response
-    return ScriptResponse(
-        task_id=task_id,
-        script_content=script_content,  # Will be updated after optimization
-        transcription_data=[]
-    )
-
-
 @router.post("/generate-video")
 async def generate_video(
     request: GenerateVideoRequest,
@@ -698,14 +619,23 @@ async def get_task_status(task_id: str):
         )
     except ValueError:
         # Task not found, check if task directory exists
-        task_dir = FileService.create_task_directory(task_id)
+        from backend.core.config import OUTPUT_DIR
+        task_dir = OUTPUT_DIR / task_id
+        
+        # Check if directory exists with files
         if task_dir.exists() and any(task_dir.iterdir()):
             # Task directory exists but not in manager, try to restore
-            # Check for script or transcription files to determine status
+            # Check for script or transcription files
             script_path = task_dir / "script.md"
             transcription_path = task_dir / "transcription.py"
+            video_path = task_dir / "presentation.mp4"
             
-            if transcription_path.exists():
+            # Determine status based on available files
+            if video_path and video_path.exists():
+                # Video is completed
+                status = TaskStatus.COMPLETED
+                progress_val = 100.0
+            elif transcription_path.exists():
                 # Script is ready
                 status = TaskStatus.SCRIPT_READY
                 progress_val = 50.0
@@ -719,9 +649,12 @@ async def get_task_status(task_id: str):
                 progress_val = 10.0
             
             # Restore task in manager
+            abstract_path = task_dir / "abstract.md"
+            pdf_path = task_dir / "presentation.pdf"
+            
             task_info = {
-                "abstract_path": str(task_dir / "abstract.md"),
-                "pdf_path": str(task_dir / "presentation.pdf") if (task_dir / "presentation.pdf").exists() else None,
+                "abstract_path": str(abstract_path) if abstract_path.exists() else None,
+                "pdf_path": str(pdf_path) if pdf_path.exists() else None,
             }
             task_manager.create_task(task_id, task_info)
             task_manager.update_status(task_id, status, progress_val, f"Task restored (status: {status.value})")

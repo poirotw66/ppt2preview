@@ -106,7 +106,7 @@ python -m pip show google-generativeai
 1. 檢查檔案大小限制
 2. 確認檔案格式正確（Markdown 和 PDF）
 3. 檢查後端日誌中的錯誤訊息
-4. 確認 `uploads/` 和 `temp/` 目錄有寫入權限
+4. 確認 `uploads/` 和 `output/` 目錄有寫入權限
 
 ## 診斷工具
 

@@ -16,6 +16,28 @@ from PIL import Image as PILImage
 
 PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT")
 
+# Shared TTS client instance for all threads to reuse
+_tts_client = None
+_tts_client_lock = __import__('threading').Lock()
+
+def _get_tts_client():
+    """Get or create a shared TTS client instance.
+    
+    Returns:
+        TextToSpeechClient instance
+    """
+    global _tts_client
+    if _tts_client is None:
+        with _tts_client_lock:
+            if _tts_client is None:  # Double-check pattern
+                # Clear invalid GOOGLE_APPLICATION_CREDENTIALS if it's a placeholder
+                creds_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+                if creds_path and ("/path/to/your/" in creds_path or creds_path == "your-google-cloud-credentials.json"):
+                    if "GOOGLE_APPLICATION_CREDENTIALS" in os.environ:
+                        del os.environ["GOOGLE_APPLICATION_CREDENTIALS"]
+                _tts_client = texttospeech.TextToSpeechClient()
+    return _tts_client
+
 # Style prompts for different speakers
 SPEAKER_STYLES = {
     "講者": "Speak in a warm, engaging, and authoritative tone like a knowledgeable teacher sharing fascinating insights with genuine enthusiasm. Guide the audience through the presentation slides with clear visual references and storytelling.",
@@ -125,15 +147,8 @@ def synthesize_speech(
     Returns:
         Path to generated audio file
     """
-    # Clear invalid GOOGLE_APPLICATION_CREDENTIALS if it's a placeholder
-    creds_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-    if creds_path and ("/path/to/your/" in creds_path or creds_path == "your-google-cloud-credentials.json"):
-        # Remove invalid placeholder from environment
-        if "GOOGLE_APPLICATION_CREDENTIALS" in os.environ:
-            del os.environ["GOOGLE_APPLICATION_CREDENTIALS"]
-    
-    # Create client (will use default credentials automatically)
-    client = texttospeech.TextToSpeechClient()
+    # Get shared TTS client (reuses connection across threads)
+    client = _get_tts_client()
     
     # Check total size (prompt + text)
     prompt_bytes = len(prompt.encode('utf-8'))
@@ -236,19 +251,20 @@ def is_valid_image(image_path: str) -> bool:
         return False
 
 
-def pdf_to_images(pdf_path: str, output_dir: str = "slides") -> List[str]:
+def pdf_to_images(pdf_path: str, output_dir: str = "slides", dpi: int = 200) -> List[str]:
     """Convert PDF pages to images.
     
     Args:
         pdf_path: Path to PDF file
         output_dir: Directory to save images
+        dpi: DPI for image conversion (default: 200 for high quality)
         
     Returns:
         List of image file paths in page order
     """
     Path(output_dir).mkdir(exist_ok=True)
     
-    images = convert_from_path(pdf_path, dpi=72)
+    images = convert_from_path(pdf_path, dpi=dpi)
     
     image_paths = []
     for i, image in enumerate(images, start=1):
@@ -310,32 +326,32 @@ def _generate_audio_segment_with_order(
     audio_path = os.path.join(output_dir, audio_filename)
     
     try:
-        # Log start
-        text_preview = text[:50] + "..." if len(text) > 50 else text
-        print(f"[AUDIO GENERATION] Starting item {global_index} (page {page_num}): {text_preview}")
+        # Log start (simplified for less I/O overhead)
+        if global_index % 5 == 0 or total_items <= 10:  # Only log every 5th item or if total is small
+            text_preview = text[:50] + "..." if len(text) > 50 else text
+            print(f"[AUDIO GENERATION] Starting item {global_index} (page {page_num}): {text_preview}")
         
         style_prompt = SPEAKER_STYLES.get(speaker, SPEAKER_STYLES["講者"])
         synthesize_speech(style_prompt, text, audio_path, language_code="cmn-tw")
         
-        # Verify file was created
+        # Verify file was created and get size
         if not os.path.exists(audio_path):
             raise FileNotFoundError(f"Audio file was not created: {audio_path}")
         
-        # Check file size
         file_size = os.path.getsize(audio_path)
         if file_size == 0:
             raise ValueError(f"Audio file is empty: {audio_path}")
         
-        print(f"[AUDIO GENERATION] Audio file created: {audio_filename} ({file_size} bytes)")
-        
+        # Get duration
         audio_clip = AudioFileClip(audio_path)
         duration = audio_clip.duration
         audio_clip.close()
         
+        # Simplified logging - one line per file
+        print(f"[AUDIO GENERATION] ✓ {audio_filename} ({duration:.1f}s, {file_size//1024}KB)")
+        
         if progress_callback:
             progress_callback(f"[{original_index + 1}/{total_items}] Generated: {audio_filename} ({duration:.2f}s)")
-        
-        print(f"[AUDIO GENERATION] Completed item {global_index}: {audio_filename} ({duration:.2f}s)")
         
         return (page_num, audio_path, duration, global_index)
     except Exception as e:
@@ -435,12 +451,15 @@ def process_transcription_to_audio(
             
             if expected_files.issubset(existing_file_set):
                 # All required files exist, load them
-                print(f"[AUDIO GENERATION] All {total_tasks} audio files already exist, loading metadata...")
+                print(f"[AUDIO GENERATION] All {total_tasks} audio files already exist, skipping generation")
                 if progress_callback:
-                    progress_callback(f"All {total_tasks} audio files already exist, loading metadata...")
+                    progress_callback(f"All {total_tasks} audio files already exist, skipping generation")
                 
+                # Use multi-threading to quickly load audio file metadata
                 audio_segments = []
-                for task in tasks:
+                
+                def load_audio_metadata(task):
+                    """Load audio file metadata (duration) for a single file."""
                     page_num = task[0]
                     global_idx = task[1]
                     audio_filename = f"page_{page_num}_item_{global_idx:04d}.mp3"
@@ -448,25 +467,37 @@ def process_transcription_to_audio(
                     
                     if os.path.exists(audio_path):
                         try:
-                            # Get duration
+                            # Get duration using AudioFileClip
                             audio_clip = AudioFileClip(audio_path)
                             duration = audio_clip.duration
                             audio_clip.close()
-                            audio_segments.append((page_num, audio_path, duration))
-                            print(f"[AUDIO GENERATION] Loaded: {audio_filename} ({duration:.2f}s)")
+                            return (page_num, audio_path, duration, global_idx)
                         except Exception as e:
                             print(f"[AUDIO GENERATION WARNING] Failed to load {audio_filename}: {e}")
-                            # If any file fails to load, we'll regenerate all
-                            break
+                            return None
+                    return None
                 
-                # If we successfully loaded all files, return them
-                if len(audio_segments) == total_tasks:
+                # Load metadata in parallel for speed
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    futures = [executor.submit(load_audio_metadata, task) for task in tasks]
+                    
+                    load_results = {}
+                    for future in as_completed(futures):
+                        result = future.result()
+                        if result is not None:
+                            global_idx = result[3]
+                            load_results[global_idx] = result[:3]
+                
+                # Check if all files loaded successfully
+                if len(load_results) == total_tasks:
+                    # Sort by global_index to maintain order
+                    audio_segments = [load_results[idx] for idx in sorted(load_results.keys())]
                     print(f"[AUDIO GENERATION] ✓ All {total_tasks} audio files loaded successfully")
                     if progress_callback:
                         progress_callback(f"✓ All {total_tasks} audio files loaded successfully")
                     return audio_segments
                 else:
-                    print(f"[AUDIO GENERATION] Some files failed to load, will regenerate all")
+                    print(f"[AUDIO GENERATION] Some files failed to load ({len(load_results)}/{total_tasks}), will regenerate all")
                     if progress_callback:
                         progress_callback(f"Some files failed to load, will regenerate all")
             else:
