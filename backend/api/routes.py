@@ -22,6 +22,7 @@ from backend.api.models import (
 from backend.services.file_service import FileService
 from backend.services.script_generator import ScriptGenerator
 from backend.services.video_generator import VideoGenerator
+from backend.services.gemini_service import GeminiService
 from backend.core.tasks import TaskManager, TaskProgress
 
 
@@ -297,19 +298,29 @@ async def update_script(task_id: str, request: UpdateScriptRequest):
     # Save to output directory only
     FileService.save_output_file(task_id, "script.md", request.script_content)
     
+    # Regenerate transcription.py from updated script using Gemini
+    try:
+        gemini_service = GeminiService()
+        transcription_data = gemini_service.rewrite_transcript(request.script_content)
+        
+        # Save updated transcription.py
+        transcription_content = str(transcription_data)
+        FileService.save_output_file(task_id, "transcription.py", transcription_content)
+    except Exception as e:
+        # If transcription generation fails, try to get existing data
+        try:
+            transcription_content = FileService.get_output_file_content(task_id, "transcription.py")
+            import ast
+            transcription_data = ast.literal_eval(transcription_content)
+        except FileNotFoundError:
+            task_info = task_manager.get_task_info(task_id)
+            transcription_data = task_info.get("transcription_data", [])
+    
     # Update task info
     task_manager.update_task_info(task_id, {
-        "script_content": request.script_content
+        "script_content": request.script_content,
+        "transcription_data": transcription_data
     })
-    
-    # Get transcription data
-    try:
-        transcription_content = FileService.get_output_file_content(task_id, "transcription.py")
-        import ast
-        transcription_data = ast.literal_eval(transcription_content)
-    except FileNotFoundError:
-        task_info = task_manager.get_task_info(task_id)
-        transcription_data = task_info.get("transcription_data", [])
     
     return ScriptResponse(
         task_id=task_id,
