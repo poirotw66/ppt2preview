@@ -3,6 +3,44 @@
   min-height: 100vh;
   background: var(--color-bg);
   overflow-x: hidden;
+  position: relative;
+}
+
+/* Settings Button - Fixed Position Top Right */
+.settings-button {
+  position: fixed;
+  top: var(--spacing-lg);
+  right: var(--spacing-lg);
+  z-index: 1000;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-base);
+  box-shadow: var(--shadow-md);
+}
+
+.settings-button:hover {
+  transform: rotate(90deg) scale(1.05);
+  box-shadow: var(--shadow-lg);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.settings-button:active {
+  transform: rotate(90deg) scale(0.95);
+}
+
+.settings-icon {
+  width: 24px;
+  height: 24px;
+  color: var(--color-text);
+  transition: var(--transition-base);
 }
 
 /* Hero Section - Primary CTA Placement */

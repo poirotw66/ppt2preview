@@ -6,6 +6,7 @@ import ScriptPage from './pages/ScriptPage';
 import OptimizeScriptPage from './pages/OptimizeScriptPage';
 import VideoPage from './pages/VideoPage';
 import DownloadPage from './pages/DownloadPage';
+import SettingsPage from './pages/SettingsPage';
 import { useTaskStore } from './store/useTaskStore';
 import { apiClient } from './services/api';
 import { useEffect, useState } from 'react';
@@ -105,13 +106,14 @@ function TaskRouteWrapper({ children }: { children: React.ReactNode }) {
 
 function AppContent() {
   const location = useLocation();
-  const isLandingPage = location.pathname === '/';
+  const hideNavigation = location.pathname === '/' || location.pathname === '/settings';
 
   return (
     <div className="app-container">
-      {!isLandingPage && <Navigation />}
+      {!hideNavigation && <Navigation />}
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
         <Route path="/upload" element={<UploadPage />} />
         <Route path="/task/:taskId/upload" element={<TaskRouteWrapper><UploadPage /></TaskRouteWrapper>} />
         <Route path="/task/:taskId/script" element={<TaskRouteWrapper><ScriptPage /></TaskRouteWrapper>} />
