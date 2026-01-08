@@ -61,47 +61,108 @@ function FileUpload() {
     <div className="file-upload">
       <div className="upload-section">
         <label className="file-label">
-          <span>簡報大綱檔案（Markdown）*</span>
           <input
             type="file"
             accept=".md,.markdown"
             onChange={handleAbstractFileChange}
             disabled={uploading || !!taskId}
           />
+          <div className="file-label-content">
+            <svg className="file-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+            <span className="file-label-title">
+              簡報大綱檔案（Markdown）*
+            </span>
+            <span className="file-label-hint">
+              點擊或拖曳檔案至此處上傳
+            </span>
+          </div>
           {abstractFile && (
-            <span className="file-name">已選擇: {abstractFile.name}</span>
+            <span className="file-name">
+              <svg className="file-name-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              {abstractFile.name}
+            </span>
           )}
         </label>
       </div>
 
       <div className="upload-section">
         <label className="file-label">
-          <span>PDF 投影片檔案（選填）</span>
           <input
             type="file"
             accept=".pdf"
             onChange={handlePdfFileChange}
             disabled={uploading || !!taskId}
           />
+          <div className="file-label-content">
+            <svg className="file-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+            <span className="file-label-title">
+              PDF 投影片檔案（選填）
+            </span>
+            <span className="file-label-hint">
+              點擊或拖曳檔案至此處上傳
+            </span>
+          </div>
           {pdfFile && (
-            <span className="file-name">已選擇: {pdfFile.name}</span>
+            <span className="file-name">
+              <svg className="file-name-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              {pdfFile.name}
+            </span>
           )}
         </label>
       </div>
 
-      {error && <div className="error-message">{error}</div>}
+      {error && (
+        <div className="error-message">
+          <svg className="error-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          {error}
+        </div>
+      )}
 
       <button
         className="upload-button"
         onClick={handleUpload}
         disabled={!abstractFile || uploading || !!taskId}
       >
-        {uploading ? '上傳中...' : taskId ? '已上傳' : '上傳檔案'}
+        {uploading ? (
+          <>
+            <svg className="upload-button-icon animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <span>上傳中...</span>
+          </>
+        ) : taskId ? (
+          <>
+            <svg className="upload-button-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            <span>已上傳</span>
+          </>
+        ) : (
+          <>
+            <svg className="upload-button-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            <span>上傳檔案</span>
+          </>
+        )}
       </button>
 
       {taskId && (
         <div className="success-message">
-          ✓ 檔案上傳成功！任務 ID: {taskId.substring(0, 8)}...
+          <svg className="success-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          檔案上傳成功！任務 ID: {taskId.substring(0, 8)}...
         </div>
       )}
     </div>

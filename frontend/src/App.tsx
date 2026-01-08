@@ -1,5 +1,6 @@
-import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
 import Navigation from './components/Navigation';
+import LandingPage from './pages/LandingPage';
 import UploadPage from './pages/UploadPage';
 import ScriptPage from './pages/ScriptPage';
 import OptimizeScriptPage from './pages/OptimizeScriptPage';
@@ -102,25 +103,34 @@ function TaskRouteWrapper({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function AppContent() {
+  const location = useLocation();
+  const isLandingPage = location.pathname === '/';
+
+  return (
+    <div className="app-container">
+      {!isLandingPage && <Navigation />}
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/upload" element={<UploadPage />} />
+        <Route path="/task/:taskId/upload" element={<TaskRouteWrapper><UploadPage /></TaskRouteWrapper>} />
+        <Route path="/task/:taskId/script" element={<TaskRouteWrapper><ScriptPage /></TaskRouteWrapper>} />
+        <Route path="/task/:taskId/optimize" element={<TaskRouteWrapper><OptimizeScriptPage /></TaskRouteWrapper>} />
+        <Route path="/task/:taskId/video" element={<TaskRouteWrapper><VideoPage /></TaskRouteWrapper>} />
+        <Route path="/task/:taskId/download" element={<TaskRouteWrapper><DownloadPage /></TaskRouteWrapper>} />
+        {/* Legacy routes for backward compatibility */}
+        <Route path="/script" element={<ScriptPage />} />
+        <Route path="/video" element={<VideoPage />} />
+        <Route path="/download" element={<DownloadPage />} />
+      </Routes>
+    </div>
+  );
+}
+
 function App() {
   return (
     <BrowserRouter>
-      <div className="app-container">
-        <Navigation />
-        <Routes>
-          <Route path="/" element={<Navigate to="/upload" replace />} />
-          <Route path="/upload" element={<UploadPage />} />
-          <Route path="/task/:taskId/upload" element={<TaskRouteWrapper><UploadPage /></TaskRouteWrapper>} />
-          <Route path="/task/:taskId/script" element={<TaskRouteWrapper><ScriptPage /></TaskRouteWrapper>} />
-          <Route path="/task/:taskId/optimize" element={<TaskRouteWrapper><OptimizeScriptPage /></TaskRouteWrapper>} />
-          <Route path="/task/:taskId/video" element={<TaskRouteWrapper><VideoPage /></TaskRouteWrapper>} />
-          <Route path="/task/:taskId/download" element={<TaskRouteWrapper><DownloadPage /></TaskRouteWrapper>} />
-          {/* Legacy routes for backward compatibility */}
-          <Route path="/script" element={<ScriptPage />} />
-          <Route path="/video" element={<VideoPage />} />
-          <Route path="/download" element={<DownloadPage />} />
-        </Routes>
-      </div>
+      <AppContent />
     </BrowserRouter>
   );
 }
