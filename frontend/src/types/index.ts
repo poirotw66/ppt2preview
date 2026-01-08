@@ -69,3 +69,16 @@ export interface ProgressUpdate {
   error?: string;
 }
 
+export interface HistoryProject {
+  task_id: string;
+  created_time: string | null;
+  modified_time: string | null;
+  has_script: boolean;
+  has_video: boolean;
+  status: string;
+}
+
+export interface HistoryResponse {
+  projects: HistoryProject[];
+}
+

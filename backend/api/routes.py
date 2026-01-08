@@ -822,3 +822,69 @@ async def websocket_endpoint(websocket: WebSocket, task_id: str):
     finally:
         connection_manager.disconnect(websocket, task_id)
 
+
+@router.get("/history")
+async def get_history_projects():
+    """Get list of all historical projects from output directory.
+    
+    Returns:
+        List of project information including task_id, created_time, status, etc.
+    """
+    import os
+    from datetime import datetime
+    
+    output_dir = Path("output")
+    if not output_dir.exists():
+        return {"projects": []}
+    
+    projects = []
+    
+    # Iterate through all directories in output/
+    for project_dir in output_dir.iterdir():
+        if not project_dir.is_dir():
+            continue
+            
+        task_id = project_dir.name
+        project_info = {
+            "task_id": task_id,
+            "created_time": None,
+            "modified_time": None,
+            "has_script": False,
+            "has_video": False,
+            "status": "unknown"
+        }
+        
+        # Get directory creation/modification time
+        try:
+            stat = project_dir.stat()
+            project_info["created_time"] = datetime.fromtimestamp(stat.st_ctime).isoformat()
+            project_info["modified_time"] = datetime.fromtimestamp(stat.st_mtime).isoformat()
+        except Exception as e:
+            print(f"Error getting stats for {task_id}: {e}")
+        
+        # Check for script file
+        script_file = project_dir / "script.md"
+        if script_file.exists():
+            project_info["has_script"] = True
+        
+        # Check for video file
+        video_file = project_dir / "output.mp4"
+        if video_file.exists():
+            project_info["has_video"] = True
+            project_info["status"] = "completed"
+        elif project_info["has_script"]:
+            project_info["status"] = "script_ready"
+        
+        # Check if task is in task_manager
+        if task_manager.task_exists(task_id):
+            task_info = task_manager.get_task_info(task_id)
+            if "status" in task_info:
+                project_info["status"] = task_info["status"]
+        
+        projects.append(project_info)
+    
+    # Sort by modified time (most recent first)
+    projects.sort(key=lambda x: x.get("modified_time") or "", reverse=True)
+    
+    return {"projects": projects}
+

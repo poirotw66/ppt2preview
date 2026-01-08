@@ -152,6 +152,14 @@ export const apiClient = {
   getFileUrl(taskId: string, filename: string): string {
     return `${API_PREFIX}/files/${taskId}/${filename}`;
   },
+
+  /**
+   * Get history projects
+   */
+  async getHistory(): Promise<import('@/types').HistoryResponse> {
+    const response = await api.get('/history');
+    return response.data;
+  },
 };
 
 export default apiClient;
