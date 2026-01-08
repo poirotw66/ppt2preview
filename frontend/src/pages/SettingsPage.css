@@ -32,7 +32,7 @@
   margin-bottom: var(--spacing-3xl);
 }
 
-.back-button {
+.settings-header .back-button {
   width: 48px;
   height: 48px;
   border-radius: var(--radius-lg);
@@ -46,19 +46,22 @@
   transition: var(--transition-base);
   box-shadow: var(--shadow-sm);
   flex-shrink: 0;
+  padding: 0;
+  min-width: auto;
+  min-height: auto;
 }
 
-.back-button:hover {
+.settings-header .back-button:hover {
   transform: translateX(-4px);
   box-shadow: var(--shadow-md);
   background: rgba(255, 255, 255, 0.15);
 }
 
-.back-button:active {
+.settings-header .back-button:active {
   transform: translateX(-2px) scale(0.95);
 }
 
-.back-button svg {
+.settings-header .back-button svg {
   width: 24px;
   height: 24px;
   color: var(--color-text);
