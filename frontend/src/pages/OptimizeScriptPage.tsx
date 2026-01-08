@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ScriptEditor from '@/components/ScriptEditor';
 import { useTaskStore } from '@/store/useTaskStore';
@@ -7,19 +7,19 @@ import './PageLayout.css';
 function OptimizeScriptPage() {
   const navigate = useNavigate();
   const { taskId, status, scriptContent } = useTaskStore();
+  const hasCheckedRedirect = useRef(false);
 
-  // Redirect if no task or script not ready
+  // Redirect only on initial load
   useEffect(() => {
+    if (hasCheckedRedirect.current) return;
+    hasCheckedRedirect.current = true;
+
     if (!taskId) {
       navigate('/upload');
     } else if (!scriptContent && status !== 'script_ready') {
       navigate(`/task/${taskId}/script`);
-    } else if (status === 'generating_video') {
-      navigate(`/task/${taskId}/video`);
-    } else if (status === 'completed') {
-      navigate(`/task/${taskId}/download`);
     }
-  }, [taskId, status, scriptContent, navigate]);
+  }, []);
 
   if (!taskId) {
     return null;

@@ -179,10 +179,24 @@ class VideoGenerator:
                         new_width = new_width if new_width % 2 == 0 else new_width - 1
                         new_height = new_height if new_height % 2 == 0 else new_height - 1
                         
-                        # Resize image
+                        # Resize image with optimized method
                         new_size = (new_width, new_height)
-                        # Use LANCZOS for better quality when scaling
-                        pil_img = pil_img.resize(new_size, PILImage.Resampling.LANCZOS)
+                        
+                        # Convert to RGB if needed (for JPEG compatibility and speed)
+                        if pil_img.mode != 'RGB':
+                            pil_img = pil_img.convert('RGB')
+                        
+                        # Use thumbnail for faster downscaling (maintains aspect ratio automatically)
+                        # For downscaling: thumbnail is faster than resize while maintaining quality
+                        if scale < 1.0:
+                            # Downscaling: use thumbnail for speed
+                            pil_img.thumbnail(new_size, PILImage.Resampling.LANCZOS)
+                            # Thumbnail modifies in-place and may not match exact size, so check
+                            if pil_img.size != new_size:
+                                pil_img = pil_img.resize(new_size, PILImage.Resampling.LANCZOS)
+                        else:
+                            # Upscaling: use BICUBIC for better speed/quality balance
+                            pil_img = pil_img.resize(new_size, PILImage.Resampling.BICUBIC)
                         
                         # If image doesn't match target resolution, create a canvas and center the image
                         if (new_width, new_height) != (max_width, max_height):
@@ -198,10 +212,11 @@ class VideoGenerator:
                         else:
                             self._log(f"  圖片調整: {original_size} -> {new_size}")
                         
-                        # Save the final image
-                        resized_name = f"page_{page_num}_resized.png"
+                        # Save as JPEG instead of PNG for much faster I/O and smaller file size
+                        # Quality 95 maintains excellent visual quality while being much faster
+                        resized_name = f"page_{page_num}_resized.jpg"
                         resized_path = output_slides_dir / resized_name
-                        pil_img.save(str(resized_path), 'PNG', optimize=True, compress_level=1)
+                        pil_img.save(str(resized_path), 'JPEG', quality=95, optimize=True)
                         image_path = str(resized_path)
                         
                         img_clip = ImageClip(image_path).set_duration(total_duration)

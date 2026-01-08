@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ProgressTracker from '@/components/ProgressTracker';
 import { useTaskStore } from '@/store/useTaskStore';
@@ -7,21 +7,23 @@ import './PageLayout.css';
 function VideoPage() {
   const navigate = useNavigate();
   const { taskId, status } = useTaskStore();
+  const hasCheckedRedirect = useRef(false);
 
-  // Redirect if no task or not ready
+  // Redirect only on initial load, not when status changes
   useEffect(() => {
+    if (hasCheckedRedirect.current) return;
+    hasCheckedRedirect.current = true;
+
     if (!taskId) {
       navigate('/upload');
-    } else if (status === 'completed') {
-      navigate(`/task/${taskId}/download`);
     } else if (status === 'failed') {
       // Stay on video page to show error
       return;
-    } else if (status !== 'generating_video' && status !== 'script_ready') {
-      // Only redirect if not in error state
+    } else if (status !== 'generating_video' && status !== 'script_ready' && status !== 'completed') {
+      // Only redirect if not in valid state
       navigate(`/task/${taskId}/optimize`);
     }
-  }, [taskId, status, navigate]);
+  }, []);
 
   if (!taskId) {
     return null;

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ScriptEditor from '@/components/ScriptEditor';
 import { useTaskStore } from '@/store/useTaskStore';
@@ -10,17 +10,17 @@ function ScriptPage() {
   const { taskId, status, scriptContent, updateStatus } = useTaskStore();
   const [optimizing, setOptimizing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const hasCheckedRedirect = useRef(false);
 
-  // Redirect if no task or already completed
+  // Redirect only on initial load
   useEffect(() => {
+    if (hasCheckedRedirect.current) return;
+    hasCheckedRedirect.current = true;
+
     if (!taskId) {
       navigate('/upload');
-    } else if (status === 'generating_video') {
-      navigate(`/task/${taskId}/video`);
-    } else if (status === 'completed') {
-      navigate(`/task/${taskId}/download`);
     }
-  }, [taskId, status, navigate]);
+  }, []);
 
   const handleOptimizeScript = async () => {
     if (!taskId) return;
