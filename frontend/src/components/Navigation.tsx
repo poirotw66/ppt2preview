@@ -35,15 +35,39 @@ function Navigation() {
     });
     const stepIndex = steps.findIndex(s => s.path === stepPath);
 
-    // Check if step is accessible
+    // Check if step is completed based on task status
     const hasTaskId = urlTaskId || taskId;
+    
+    // Step 1 (Upload) is completed if we have a task ID
+    if (stepNumber === 1 && hasTaskId) {
+      return stepIndex === currentIndex ? 'active' : 'completed';
+    }
+    
+    // Step 2 (Generate Script) is completed if script is ready or beyond
+    if (stepNumber === 2 && (status === 'script_ready' || status === 'generating_video' || status === 'completed')) {
+      return stepIndex === currentIndex ? 'active' : 'completed';
+    }
+    
+    // Step 3 (Optimize Script) is completed if we've moved to video generation or completed
+    if (stepNumber === 3 && (status === 'generating_video' || status === 'completed')) {
+      return stepIndex === currentIndex ? 'active' : 'completed';
+    }
+    
+    // Step 4 (Generate Video) is completed if video is completed
+    if (stepNumber === 4 && status === 'completed') {
+      return stepIndex === currentIndex ? 'active' : 'completed';
+    }
+
+    // Check if step is accessible (disabled)
     if (stepNumber === 2 && !hasTaskId) return 'disabled';
-    if (stepNumber === 3 && (!hasTaskId || status !== 'script_ready')) return 'disabled';
-    if (stepNumber === 4 && (!hasTaskId || status !== 'script_ready' && status !== 'generating_video')) return 'disabled';
+    if (stepNumber === 3 && (!hasTaskId || (status !== 'script_ready' && status !== 'generating_video' && status !== 'completed'))) return 'disabled';
+    if (stepNumber === 4 && (!hasTaskId || (status !== 'script_ready' && status !== 'generating_video' && status !== 'completed'))) return 'disabled';
     if (stepNumber === 5 && status !== 'completed') return 'disabled';
 
-    if (stepIndex < currentIndex) return 'completed';
+    // If on current step, mark as active
     if (stepIndex === currentIndex) return 'active';
+    
+    // Otherwise pending
     return 'pending';
   };
 
