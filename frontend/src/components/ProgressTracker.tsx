@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTaskStore } from '@/store/useTaskStore';
+import { useSettingsStore } from '@/store/useSettingsStore';
 import { apiClient } from '@/services/api';
 import { WebSocketClient } from '@/services/websocket';
 import { VideoParams } from '@/types';
@@ -7,6 +8,7 @@ import './ProgressTracker.css';
 
 function ProgressTracker() {
   const { taskId, status, progress, currentStep, message, error, updateStatus } = useTaskStore();
+  const { selectedVoice } = useSettingsStore();
   const [wsClient, setWsClient] = useState<WebSocketClient | null>(null);
   const [generating, setGenerating] = useState(false);
   
@@ -66,6 +68,7 @@ function ProgressTracker() {
       await apiClient.generateVideo({
         task_id: taskId,
         video_params: videoParams,
+        voice_name: selectedVoice,
       });
     } catch (err: any) {
       console.error('Failed to start video generation:', err);

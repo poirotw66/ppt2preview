@@ -132,6 +132,7 @@ def synthesize_speech(
     text: str, 
     output_filepath: str,
     language_code: str = "cmn-tw",
+    voice_name: str = "Aoede",
     max_retries: int = 3
 ) -> str:
     """Synthesizes speech from the input text and saves it to an MP3 file.
@@ -145,6 +146,7 @@ def synthesize_speech(
         text: The text to synthesize.
         output_filepath: The path to save the generated audio file.
         language_code: Language code (default: cmn-tw for Traditional Chinese)
+        voice_name: Voice name for TTS (default: Aoede)
         max_retries: Maximum number of retry attempts (default: 3)
         
     Returns:
@@ -173,7 +175,7 @@ def synthesize_speech(
             chunk_path = f"{base_path}_chunk_{idx}.{extension}"
             # Recursively call synthesize_speech for each chunk (without prompt after first chunk)
             chunk_prompt = prompt if idx == 0 else ""  # Only use prompt for first chunk
-            synthesize_speech(chunk_prompt, chunk, chunk_path, language_code, max_retries)
+            synthesize_speech(chunk_prompt, chunk, chunk_path, language_code, voice_name, max_retries)
             audio_files.append(chunk_path)
         
         # Concatenate audio files
@@ -216,7 +218,7 @@ def synthesize_speech(
             # Select the voice - using Gemini TTS model
             voice = texttospeech.VoiceSelectionParams(
                 language_code=language_code,
-                name="Charon",
+                name=voice_name,
                 model_name="gemini-2.5-flash-tts"  # Using flash model for faster generation
             )
             
@@ -345,6 +347,7 @@ def _generate_audio_segment_with_order(
     output_dir: str,
     original_index: int,
     total_items: int,
+    voice_name: str = "Aoede",
     progress_callback=None
 ) -> Tuple[int, str, float, int]:
     """Generate a single audio segment for one dialogue item.
@@ -357,6 +360,7 @@ def _generate_audio_segment_with_order(
         output_dir: Directory to save audio files
         original_index: Original index in transcription_data
         total_items: Total number of items
+        voice_name: Voice name for TTS (default: Aoede)
         progress_callback: Optional callback for progress updates
         
     Returns:
@@ -372,7 +376,7 @@ def _generate_audio_segment_with_order(
             print(f"[AUDIO GENERATION] Starting item {global_index} (page {page_num}): {text_preview}")
         
         style_prompt = SPEAKER_STYLES.get(speaker, SPEAKER_STYLES["講者"])
-        synthesize_speech(style_prompt, text, audio_path, language_code="cmn-tw")
+        synthesize_speech(style_prompt, text, audio_path, language_code="cmn-tw", voice_name=voice_name)
         
         # Verify file was created and get size
         if not os.path.exists(audio_path):
@@ -406,6 +410,7 @@ def process_transcription_to_audio(
     transcription_data: List[Tuple[str, str]],
     output_dir: str = "audio_segments",
     max_workers: int = 10,
+    voice_name: str = "Aoede",
     progress_callback=None
 ) -> List[Tuple[int, str, float]]:
     """Process transcription and generate audio files using multi-threading.
@@ -414,6 +419,7 @@ def process_transcription_to_audio(
         transcription_data: List of (speaker, text) tuples
         output_dir: Directory to save audio files
         max_workers: Maximum number of worker threads
+        voice_name: Voice name for TTS (default: Aoede)
         progress_callback: Optional callback for progress updates
         
     Returns:
@@ -557,7 +563,7 @@ def process_transcription_to_audio(
         future_to_task = {}
         for task in tasks:
             # task structure: (page_num, global_index, text, speaker, output_dir, original_index, total_items)
-            future = executor.submit(_generate_audio_segment_with_order, *task, progress_callback)
+            future = executor.submit(_generate_audio_segment_with_order, *task, voice_name, progress_callback)
             future_to_task[future] = task
         
         # Collect results as they complete (like test.py)

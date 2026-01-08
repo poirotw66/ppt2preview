@@ -61,6 +61,7 @@ class GenerateVideoRequest(BaseModel):
     """Request for video generation."""
     task_id: str
     video_params: Optional[VideoParams] = None
+    voice_name: Optional[str] = Field(default="Aoede", description="TTS voice name for Gemini Flash TTS")
 
 
 class TaskStatusResponse(BaseModel):

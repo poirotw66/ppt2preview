@@ -42,7 +42,8 @@ class VideoGenerator:
         fps: int = DEFAULT_FPS,
         resolution: Tuple[int, int] = DEFAULT_RESOLUTION,
         bitrate: str = DEFAULT_BITRATE,
-        preset: str = DEFAULT_PRESET
+        preset: str = DEFAULT_PRESET,
+        voice_name: str = "Aoede"
     ):
         """Create presentation video.
         
@@ -55,6 +56,7 @@ class VideoGenerator:
             resolution: Video resolution (width, height)
             bitrate: Video bitrate
             preset: Encoding preset
+            voice_name: Voice name for TTS (default: Aoede)
         """
         import traceback
         
@@ -115,6 +117,7 @@ class VideoGenerator:
                     parsed_data,
                     str(audio_dir),
                     max_workers=MAX_WORKERS,
+                    voice_name=voice_name,
                     progress_callback=self._log
                 )
                 self._log(f"✓ 所有音訊片段產生完成！共 {len(audio_segments)} 個片段")

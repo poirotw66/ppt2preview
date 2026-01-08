@@ -48,6 +48,7 @@ export interface VideoParams {
 export interface GenerateVideoRequest {
   task_id: string;
   video_params?: VideoParams;
+  voice_name?: string;
 }
 
 export interface TaskStatusResponse {

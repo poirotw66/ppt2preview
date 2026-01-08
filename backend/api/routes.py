@@ -435,6 +435,7 @@ async def generate_video(
     
     # Video parameters
     video_params = request.video_params
+    voice_name = request.voice_name if request.voice_name else "Aoede"
     fps = video_params.fps if video_params else 5
     resolution = (
         video_params.resolution_width if video_params else 1920,
@@ -492,7 +493,8 @@ async def generate_video(
                         fps=fps,
                         resolution=resolution,
                         bitrate=bitrate,
-                        preset=preset
+                        preset=preset,
+                        voice_name=voice_name
                     )
                     print(f"[VIDEO GENERATION] Video generation completed successfully")
                 except Exception as e:
