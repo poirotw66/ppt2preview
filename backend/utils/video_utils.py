@@ -363,6 +363,8 @@ def process_transcription_to_audio(
     Returns:
         List of (page_number, audio_path, duration) tuples
     """
+    from concurrent.futures import as_completed
+    
     Path(output_dir).mkdir(exist_ok=True)
     
     tasks = []
@@ -395,12 +397,12 @@ def process_transcription_to_audio(
             ))
             global_index += 1
     
-    audio_segments = []
     total_tasks = len(tasks)
     
     if progress_callback:
         progress_callback(f"Found {total_tasks} dialogue items to process")
-        progress_callback(f"Generating {total_tasks} audio files using {max_workers} threads...")
+    
+    print(f"[AUDIO GENERATION] Found {total_tasks} dialogue items to process")
     
     if total_tasks == 0:
         error_msg = "No dialogue items found in transcription data. Please check the transcription format."
@@ -413,115 +415,128 @@ def process_transcription_to_audio(
             print(f"[AUDIO GENERATION ERROR]   [{idx}] speaker='{item[0]}', text='{item[1][:50]}...'")
         raise ValueError(error_msg)
     
+    # Check if audio files already exist
+    if os.path.exists(output_dir):
+        existing_files = [f for f in os.listdir(output_dir) if f.endswith(".mp3")]
+        if len(existing_files) > 0:
+            print(f"[AUDIO GENERATION] Found {len(existing_files)} existing audio files")
+            if progress_callback:
+                progress_callback(f"Found {len(existing_files)} existing audio files")
+            
+            # Check if we have all required files
+            expected_files = set()
+            for task in tasks:
+                page_num = task[0]
+                global_idx = task[1]
+                expected_filename = f"page_{page_num}_item_{global_idx:04d}.mp3"
+                expected_files.add(expected_filename)
+            
+            existing_file_set = set(existing_files)
+            
+            if expected_files.issubset(existing_file_set):
+                # All required files exist, load them
+                print(f"[AUDIO GENERATION] All {total_tasks} audio files already exist, loading metadata...")
+                if progress_callback:
+                    progress_callback(f"All {total_tasks} audio files already exist, loading metadata...")
+                
+                audio_segments = []
+                for task in tasks:
+                    page_num = task[0]
+                    global_idx = task[1]
+                    audio_filename = f"page_{page_num}_item_{global_idx:04d}.mp3"
+                    audio_path = os.path.join(output_dir, audio_filename)
+                    
+                    if os.path.exists(audio_path):
+                        try:
+                            # Get duration
+                            audio_clip = AudioFileClip(audio_path)
+                            duration = audio_clip.duration
+                            audio_clip.close()
+                            audio_segments.append((page_num, audio_path, duration))
+                            print(f"[AUDIO GENERATION] Loaded: {audio_filename} ({duration:.2f}s)")
+                        except Exception as e:
+                            print(f"[AUDIO GENERATION WARNING] Failed to load {audio_filename}: {e}")
+                            # If any file fails to load, we'll regenerate all
+                            break
+                
+                # If we successfully loaded all files, return them
+                if len(audio_segments) == total_tasks:
+                    print(f"[AUDIO GENERATION] ✓ All {total_tasks} audio files loaded successfully")
+                    if progress_callback:
+                        progress_callback(f"✓ All {total_tasks} audio files loaded successfully")
+                    return audio_segments
+                else:
+                    print(f"[AUDIO GENERATION] Some files failed to load, will regenerate all")
+                    if progress_callback:
+                        progress_callback(f"Some files failed to load, will regenerate all")
+            else:
+                missing_files = expected_files - existing_file_set
+                print(f"[AUDIO GENERATION] Missing {len(missing_files)} files, will generate them")
+                if progress_callback:
+                    progress_callback(f"Missing {len(missing_files)} files, will generate them")
+    
+    # Generate audio files
+    if progress_callback:
+        progress_callback(f"Generating {total_tasks} audio files using {max_workers} threads...")
+    print(f"[AUDIO GENERATION] Generating {total_tasks} audio files using {max_workers} threads...")
+    
+    # Use ThreadPoolExecutor with as_completed (like test.py)
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Submit all tasks
         future_to_task = {}
-        task_start_times = {}  # Track when each task started
-        
         for task in tasks:
             # task structure: (page_num, global_index, text, speaker, output_dir, original_index, total_items)
             future = executor.submit(_generate_audio_segment_with_order, *task, progress_callback)
             future_to_task[future] = task
-            task_start_times[future] = time.time()
         
-        # Collect results in order with progress reporting and timeout handling
+        # Collect results as they complete (like test.py)
         results = {}
         completed_count = 0
         start_time = time.time()
-        TIMEOUT_PER_TASK = 300  # 5 minutes per task (increased for long texts)
-        CHECK_INTERVAL = 10  # Check status every 10 seconds
         
-        print(f"[AUDIO GENERATION] Starting to process {total_tasks} tasks with timeout {TIMEOUT_PER_TASK}s per task")
+        print(f"[AUDIO GENERATION] Starting to process {total_tasks} tasks")
         
-        # Use a loop with timeout checking instead of just as_completed
-        remaining_futures = set(future_to_task.keys())
-        last_status_time = time.time()
-        
-        while remaining_futures:
-            # Check for completed futures
-            done_futures = [f for f in remaining_futures if f.done()]
-            
-            for future in done_futures:
+        for future in as_completed(future_to_task):
+            try:
+                result = future.result()
+                # result is (page_num, audio_path, duration, global_index)
+                global_idx = result[3]  # Extract global_index
+                results[global_idx] = result[:3]  # Store (page_num, audio_path, duration)
+                completed_count += 1
+                
+                elapsed_time = time.time() - start_time
+                print(f"[AUDIO GENERATION] Progress: {completed_count}/{total_tasks} completed (elapsed: {elapsed_time:.1f}s)")
+                
+                if progress_callback:
+                    progress_callback(f"Progress: {completed_count}/{total_tasks} audio files generated (elapsed: {elapsed_time:.1f}s)")
+                    
+            except Exception as e:
                 task = future_to_task[future]
-                task_start_time = task_start_times.get(future, start_time)
-                
-                try:
-                    result = future.result()  # Get result (should not block since done() is True)
-                    task_duration = time.time() - task_start_time
-                    
-                    # result is (page_num, audio_path, duration, global_index)
-                    global_idx = result[3]  # Extract global_index
-                    results[global_idx] = result[:3]  # Store (page_num, audio_path, duration)
-                    completed_count += 1
-                    
-                    # Report progress
-                    elapsed_time = time.time() - start_time
-                    if progress_callback:
-                        progress_callback(f"Progress: {completed_count}/{total_tasks} audio files generated (elapsed: {elapsed_time:.1f}s)")
-                    print(f"[AUDIO GENERATION] Progress: {completed_count}/{total_tasks} completed (task {global_idx} took {task_duration:.1f}s)")
-                    
-                except Exception as e:
-                    task_duration = time.time() - task_start_time
-                    error_msg = f"Error generating audio for item {task[5]} (global_index {task[1]}): {e}"
-                    if progress_callback:
-                        progress_callback(f"ERROR: {error_msg}")
-                    print(f"[AUDIO GENERATION ERROR] {error_msg}")
-                    print(f"[AUDIO GENERATION ERROR] Task took {task_duration:.1f}s before failing")
-                    print(f"[AUDIO GENERATION ERROR] Traceback:\n{traceback.format_exc()}")
-                    raise
-                
-                remaining_futures.remove(future)
-            
-            # Check for timeouts
-            current_time = time.time()
-            for future in list(remaining_futures):
-                task = future_to_task[future]
-                task_start_time = task_start_times.get(future, start_time)
-                task_elapsed = current_time - task_start_time
-                
-                if task_elapsed > TIMEOUT_PER_TASK:
-                    error_msg = f"Task {task[1]} (item {task[5]}, page {task[0]}) timed out after {task_elapsed:.1f}s"
-                    if progress_callback:
-                        progress_callback(f"ERROR: {error_msg}")
-                    print(f"[AUDIO GENERATION ERROR] {error_msg}")
-                    print(f"[AUDIO GENERATION ERROR] Text preview: {task[2][:100]}...")
-                    # Cancel the future
-                    future.cancel()
-                    remaining_futures.remove(future)
-                    raise Exception(error_msg)
-            
-            # Periodic status report
-            if current_time - last_status_time >= CHECK_INTERVAL:
-                pending_indices = [future_to_task[f][1] for f in remaining_futures]
-                running_times = {future_to_task[f][1]: time.time() - task_start_times.get(f, start_time) 
-                                for f in remaining_futures}
-                print(f"[AUDIO GENERATION] Status: {completed_count}/{total_tasks} completed, {len(remaining_futures)} still running")
-                if pending_indices:
-                    print(f"[AUDIO GENERATION] Pending tasks: {sorted(pending_indices)[:10]}...")
-                    print(f"[AUDIO GENERATION] Running times: {dict(list(running_times.items())[:5])}")
-                last_status_time = current_time
-            
-            # Small sleep to avoid busy waiting
-            if not done_futures:
-                time.sleep(0.5)
+                error_msg = f"Error generating audio for item {task[5]} (global_index {task[1]}): {e}"
+                print(f"[AUDIO GENERATION ERROR] {error_msg}")
+                print(f"[AUDIO GENERATION ERROR] Traceback:\n{traceback.format_exc()}")
+                if progress_callback:
+                    progress_callback(f"ERROR: {error_msg}")
+                raise
         
         # Verify all tasks completed
         if len(results) != total_tasks:
             missing_indices = set(range(total_tasks)) - set(results.keys())
             error_msg = f"Not all audio files were generated. Missing indices: {sorted(missing_indices)}"
-            if progress_callback:
-                progress_callback(f"ERROR: {error_msg}")
             print(f"[AUDIO GENERATION ERROR] {error_msg}")
             print(f"[AUDIO GENERATION ERROR] Expected {total_tasks} files, got {len(results)}")
             print(f"[AUDIO GENERATION ERROR] Completed indices: {sorted(results.keys())}")
+            if progress_callback:
+                progress_callback(f"ERROR: {error_msg}")
             raise ValueError(error_msg)
         
         # Sort by global_index to maintain order
         audio_segments = [results[idx] for idx in sorted(results.keys())]
         
         total_time = time.time() - start_time
+        print(f"[AUDIO GENERATION] ✓ All {total_tasks} audio files generated successfully in {total_time:.1f}s")
         if progress_callback:
             progress_callback(f"✓ All {total_tasks} audio files generated successfully in {total_time:.1f}s")
-        print(f"[AUDIO GENERATION] ✓ All {total_tasks} audio files generated successfully in {total_time:.1f}s")
     
     return audio_segments
 

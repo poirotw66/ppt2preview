@@ -33,7 +33,7 @@ function OptimizeScriptPage() {
       </div>
 
       <div className="page-content">
-        <ScriptEditor showOptimizeButton={true} />
+        <ScriptEditor showOptimizeButton={false} />
       </div>
 
       <div className="page-footer">

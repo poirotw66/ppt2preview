@@ -120,3 +120,5 @@ python3 -c "from google.cloud import texttospeech; client = texttospeech.TextToS
 - 可以精確控制權限
 - 適合 CI/CD 環境
 
+
+

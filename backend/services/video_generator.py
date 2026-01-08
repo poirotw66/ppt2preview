@@ -163,12 +163,30 @@ class VideoGenerator:
                         original_size = pil_img.size
                         
                         max_width, max_height = resolution
+                        needs_resize = False
+                        
+                        # Calculate target size
                         if original_size[0] > max_width or original_size[1] > max_height:
+                            # Need to scale down
                             scale = min(max_width / original_size[0], max_height / original_size[1])
                             new_width = int(original_size[0] * scale)
                             new_height = int(original_size[1] * scale)
-                            new_width = new_width if new_width % 2 == 0 else new_width - 1
-                            new_height = new_height if new_height % 2 == 0 else new_height - 1
+                            needs_resize = True
+                        else:
+                            # No scaling needed, but still check dimensions
+                            new_width = original_size[0]
+                            new_height = original_size[1]
+                        
+                        # Ensure dimensions are even (required by H.264 encoder)
+                        if new_width % 2 != 0:
+                            new_width = new_width - 1
+                            needs_resize = True
+                        if new_height % 2 != 0:
+                            new_height = new_height - 1
+                            needs_resize = True
+                        
+                        # Resize if needed
+                        if needs_resize:
                             new_size = (new_width, new_height)
                             pil_img = pil_img.resize(new_size, PILImage.Resampling.NEAREST)
                             
@@ -177,6 +195,7 @@ class VideoGenerator:
                             resized_path = output_slides_dir / resized_name
                             pil_img.save(str(resized_path), 'PNG', optimize=True, compress_level=1)
                             image_path = str(resized_path)
+                            self._log(f"  圖片調整: {original_size} -> {new_size} (確保尺寸為偶數)")
                         
                         img_clip = ImageClip(image_path).set_duration(total_duration)
                         

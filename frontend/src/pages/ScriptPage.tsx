@@ -1,12 +1,15 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ScriptEditor from '@/components/ScriptEditor';
 import { useTaskStore } from '@/store/useTaskStore';
+import { apiClient } from '@/services/api';
 import './PageLayout.css';
 
 function ScriptPage() {
   const navigate = useNavigate();
-  const { taskId, status, scriptContent } = useTaskStore();
+  const { taskId, status, scriptContent, updateStatus } = useTaskStore();
+  const [optimizing, setOptimizing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Redirect if no task or already completed
   useEffect(() => {
@@ -18,6 +21,53 @@ function ScriptPage() {
       navigate(`/task/${taskId}/download`);
     }
   }, [taskId, status, navigate]);
+
+  const handleOptimizeScript = async () => {
+    if (!taskId) return;
+
+    setOptimizing(true);
+    setError(null);
+
+    try {
+      await apiClient.optimizeScript(taskId);
+
+      // Poll for optimization completion
+      const pollInterval = setInterval(async () => {
+        try {
+          const statusResponse = await apiClient.getTaskStatus(taskId!);
+          updateStatus(statusResponse);
+          
+          if (statusResponse.status === 'script_ready') {
+            clearInterval(pollInterval);
+            // Load the optimized script
+            const scriptResponse = await apiClient.getScript(taskId!);
+            useTaskStore.getState().setScript(scriptResponse);
+            setOptimizing(false);
+            // Navigate to optimize page to show optimized script
+            navigate(`/task/${taskId}/optimize`);
+          } else if (statusResponse.status === 'failed') {
+            clearInterval(pollInterval);
+            setError(statusResponse.error || '腳本優化失敗');
+            setOptimizing(false);
+          }
+        } catch (err) {
+          console.error('Polling error:', err);
+        }
+      }, 2000);
+
+      // Timeout after 5 minutes
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        if (optimizing) {
+          setError('腳本優化超時，請重試');
+          setOptimizing(false);
+        }
+      }, 300000);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || '優化腳本失敗');
+      setOptimizing(false);
+    }
+  };
 
   if (!taskId) {
     return null;
@@ -45,12 +95,15 @@ function ScriptPage() {
         {(status === 'script_ready' || scriptContent) && taskId && (
           <button
             className="next-button"
-            onClick={() => navigate(`/task/${taskId}/optimize`)}
+            onClick={handleOptimizeScript}
+            disabled={optimizing}
           >
-            下一步：優化腳本 →
+            {optimizing ? '優化中...' : '下一步：優化腳本 →'}
           </button>
         )}
       </div>
+
+      {error && <div className="error-message" style={{ textAlign: 'center', color: 'red', marginTop: '1rem' }}>{error}</div>}
     </div>
   );
 }
