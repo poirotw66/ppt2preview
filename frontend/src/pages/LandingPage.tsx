@@ -1,8 +1,14 @@
 import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import './LandingPage.css';
 
 function LandingPage() {
   const navigate = useNavigate();
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  const handleWatchDemo = () => {
+    setIsPlaying(true);
+  };
 
   const features = [
     {
@@ -102,7 +108,7 @@ function LandingPage() {
               </svg>
             </button>
             
-            <button className="cta-button secondary">
+            <button className="cta-button secondary" onClick={handleWatchDemo}>
               <svg className="button-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -140,12 +146,23 @@ function LandingPage() {
               <div className="header-title">ppt2preview.mp4</div>
             </div>
             <div className="card-content">
-              <div className="video-placeholder">
-                <svg className="video-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
+              {!isPlaying ? (
+                <div className="video-placeholder" onClick={handleWatchDemo}>
+                  <svg className="video-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+              ) : (
+                <video 
+                  controls 
+                  autoPlay 
+                  src="/example/presentation.mp4"
+                  className="demo-video-inline"
+                >
+                  您的瀏覽器不支援影片播放。
+                </video>
+              )}
             </div>
           </div>
         </div>
