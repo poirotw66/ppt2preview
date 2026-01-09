@@ -46,7 +46,6 @@
 - Gemini API Key（Gemini 2.0 Flash 模型）
 - 以下環境變數：
   ```bash
-  GOOGLE_APPLICATION_CREDENTIALS=path/to/credentials.json
   GEMINI_API_KEY=your_gemini_api_key
   ```
 
@@ -56,37 +55,86 @@
 
 ## 🚀 快速開始
 
-### 1. 克隆專案
+### 方式一：使用快速啟動腳本（推薦）
+
+#### 1. 克隆專案
 ```bash
 git clone https://github.com/poirotw66/ppt2preview.git
 cd ppt2preview
 ```
 
-### 2. 後端設置
+#### 2. 環境設定
+創建 `.env` 文件並設定環境變數：
+```bash
+# .env 文件內容
+GEMINI_API_KEY=your_gemini_api_key
+```
+
+
+
+#### 3. 啟動服務
+
+**終端機 1 - 啟動後端：**
+```bash
+# 給予執行權限（首次執行）
+chmod +x start_backend.sh
+
+# 啟動後端 API 服務（端口 8000）
+./start_backend.sh
+```
+- 後端服務會自動載入 `.env` 環境變數
+- 需要預先配置 Conda 環境（p2v）
+- 服務地址：`http://localhost:8000`
+- API 文檔：`http://localhost:8000/docs`
+
+**終端機 2 - 啟動前端：**
+```bash
+# 給予執行權限（首次執行）
+chmod +x start_frontend.sh
+
+# 啟動前端開發服務器（端口 3000）
+./start_frontend.sh
+```
+- 腳本會自動檢查並安裝依賴（如果 `node_modules` 不存在）
+- 服務地址：`http://localhost:3000`
+
+#### 4. 訪問應用
+打開瀏覽器訪問：`http://localhost:3000`
+
+---
+
+### 方式二：手動啟動
+
+#### 1. 克隆專案
+```bash
+git clone https://github.com/poirotw66/ppt2preview.git
+cd ppt2preview
+```
+
+#### 2. 後端設置
 ```bash
 # 安裝依賴
 pip install -r backend/requirements.txt
 
-# 設定 Google Cloud 憑證
-export GOOGLE_APPLICATION_CREDENTIALS="path/to/your/credentials.json"
+# 設定環境變數
 export GEMINI_API_KEY="your_gemini_api_key"
 
-# 啟動後端服務 (端口 3001)
+# 啟動後端服務（端口 8000）
 cd backend
-uvicorn main:app --host 0.0.0.0 --port 3001 --reload
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### 3. 前端設置
+#### 3. 前端設置
 ```bash
 # 安裝依賴
 cd frontend
 npm install
 
-# 啟動開發伺服器 (端口 3000)
+# 啟動開發伺服器（端口 3000）
 npm run dev
 ```
 
-### 4. 訪問應用
+#### 4. 訪問應用
 打開瀏覽器訪問：`http://localhost:3000`
 
 ## 📖 使用流程
@@ -188,7 +236,6 @@ output/{task_id}/
 ### 常見問題
 
 1. **TTS API 錯誤**
-   - 確認 `GOOGLE_APPLICATION_CREDENTIALS` 設定正確
    - 檢查 Google Cloud 專案是否啟用 Text-to-Speech API
 
 2. **Gemini API 錯誤**
@@ -200,7 +247,7 @@ output/{task_id}/
    - 檢查磁碟空間是否充足
 
 4. **前端連接失敗**
-   - 確認後端運行在 `http://localhost:3001`
+   - 確認後端運行在 `http://localhost:8000`
    - 檢查防火牆設定
 
 ## 📝 開發筆記
