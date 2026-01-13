@@ -98,7 +98,7 @@ class GeminiService:
         
         Args:
             abstract_content: Content from abstract markdown file
-            pdf_path: Optional path to PDF file (for future PDF analysis)
+            pdf_path: Optional path to PDF file (will be included in API call if provided)
             length_mode: Script length mode (SHORT, MEDIUM, LONG)
             
         Returns:
@@ -120,8 +120,47 @@ class GeminiService:
 
 請根據以上簡報大綱，生成逐頁導讀講稿。請直接從 `### [PAGE 1]` 開始你的演說。"""
         
-        # Generate script
-        response = self.model.generate_content(full_prompt)
+        # Generate script with PDF if provided
+        if pdf_path and pdf_path.exists():
+            if self._use_new_api:
+                # New API: google.genai with types.Part
+                from google.genai import types
+                
+                # Read PDF bytes
+                pdf_bytes = pdf_path.read_bytes()
+                
+                # Build contents list with PDF and prompt
+                contents = [
+                    types.Part.from_bytes(
+                        data=pdf_bytes,
+                        mime_type='application/pdf',
+                    ),
+                    full_prompt
+                ]
+                
+                # Use client.models.generate_content for new API
+                response = self.client.models.generate_content(
+                    model=GEMINI_MODEL,
+                    contents=contents
+                )
+            else:
+                # Old API: google.generativeai
+                # Upload PDF file first, then use it in generation
+                import google.generativeai as genai
+                
+                # For old API, we can upload file and include it
+                # Note: Old API may have different file handling
+                try:
+                    # Try to upload file if supported
+                    uploaded_file = genai.upload_file(path=str(pdf_path), mime_type='application/pdf')
+                    response = self.model.generate_content([uploaded_file, full_prompt])
+                except Exception:
+                    # Fallback: generate without PDF if upload fails
+                    print(f"[WARNING] Failed to upload PDF file, generating without PDF: {pdf_path}")
+                    response = self.model.generate_content(full_prompt)
+        else:
+            # No PDF provided, generate with text only
+            response = self.model.generate_content(full_prompt)
         
         # Extract text from response
         response_text = self._get_response_text(response)
