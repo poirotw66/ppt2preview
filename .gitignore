@@ -79,3 +79,5 @@ service-account-key.json
 gcloud-config/
 *.github
 *.shared
+*.DS_Store
+.DS_Store*
