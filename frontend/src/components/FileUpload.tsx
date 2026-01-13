@@ -155,12 +155,21 @@ function FileUpload() {
     try {
       const response = await apiClient.uploadFiles(abstractFile, pdfFile || undefined);
       setTaskId(response.task_id);
-      updateStatus({
-        task_id: response.task_id,
-        status: 'uploading' as any,
-        progress: 10,
-        message: response.message,
-      });
+      
+      // Fetch complete task status including project_name
+      try {
+        const statusResponse = await apiClient.getTaskStatus(response.task_id);
+        updateStatus(statusResponse);
+      } catch (statusErr) {
+        // Fallback to basic status if fetch fails
+        updateStatus({
+          task_id: response.task_id,
+          status: 'uploading' as any,
+          progress: 10,
+          message: response.message,
+        });
+      }
+      
       success('檔案上傳成功！');
       // Navigate to script page with task ID
       setTimeout(() => {

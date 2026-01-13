@@ -72,13 +72,18 @@ class ConnectionManager:
         if task_id not in self.active_connections:
             return
         
+        # Get project name from task info
+        task_info = task_manager.get_task_info(task_id)
+        project_name = task_info.get("project_name") if task_info else None
+        
         message = {
             "task_id": task_id,
             "status": progress.status.value,
             "progress": progress.progress,
             "current_step": progress.current_step,
             "message": progress.message,
-            "error": progress.error
+            "error": progress.error,
+            "project_name": project_name
         }
         
         disconnected = []
@@ -143,40 +148,60 @@ async def upload_files(
     pdf_path = None
     if pdf_file:
         pdf_path = FileService.save_uploaded_file(pdf_file, task_id, "presentation.pdf")
-        
-        # Extract PDF slides immediately for preview
-        try:
-            from backend.utils.video_utils import pdf_to_images
-            output_task_dir = FileService.get_output_task_directory(task_id)
-            output_slides_dir = output_task_dir / "slides"
-            output_slides_dir.mkdir(exist_ok=True, parents=True)
-            
-            # Convert PDF to images
-            slide_images = pdf_to_images(str(pdf_path), str(output_slides_dir))
-            print(f"✓ Extracted {len(slide_images)} slides from PDF for preview")
-        except Exception as e:
-            print(f"Warning: Failed to extract PDF slides: {e}")
-            # Don't fail upload if slide extraction fails
     
     # Initialize task status
     task_manager.create_task(task_id, {
         "abstract_path": str(abstract_path),
         "pdf_path": str(pdf_path) if pdf_path else None,
         "status": TaskStatus.UPLOADING,
-        "project_name": None  # Will be generated in background
+        "project_name": "處理中..."  # Default value, will be updated by background task
     })
     
     await update_status_and_notify(task_id, TaskStatus.UPLOADING, 10.0, "Files uploaded successfully")
     
-    # Generate project name in background
-    async def generate_project_name_task():
+    # Background tasks for processing
+    async def process_upload_background():
+        # Task 1: Extract PDF slides (if PDF was uploaded)
+        if pdf_path:
+            try:
+                from backend.utils.video_utils import pdf_to_images
+                output_task_dir = FileService.get_output_task_directory(task_id)
+                output_slides_dir = output_task_dir / "slides"
+                output_slides_dir.mkdir(exist_ok=True, parents=True)
+                
+                # Convert PDF to images
+                slide_images = pdf_to_images(str(pdf_path), str(output_slides_dir))
+                print(f"✓ Extracted {len(slide_images)} slides from PDF for preview")
+                
+                # Notify clients about slide extraction completion
+                await update_status_and_notify(
+                    task_id,
+                    TaskStatus.UPLOADING,
+                    12.0,
+                    f"已提取 {len(slide_images)} 張投影片"
+                )
+            except Exception as e:
+                error_msg = f"投影片提取失敗：{str(e)}"
+                print(f"Error: {error_msg}")
+                # Update task with error info for user visibility
+                task_manager.update_task_info(task_id, {
+                    "slide_extraction_error": error_msg
+                })
+                # Notify user about the error (but don't fail the entire upload)
+                await update_status_and_notify(
+                    task_id,
+                    TaskStatus.UPLOADING,
+                    12.0,
+                    f"⚠️ {error_msg}"
+                )
+        
+        # Task 2: Generate project name
         try:
             # Read abstract content
             with open(abstract_path, 'r', encoding='utf-8') as f:
                 abstract_content = f.read()
             
             # Generate project name using Gemini
-            from backend.services.gemini_service import GeminiService
             gemini_service = GeminiService()
             project_name = gemini_service.generate_project_name(abstract_content)
             
@@ -199,7 +224,7 @@ async def upload_files(
                 "project_name": "未命名專案"
             })
     
-    background_tasks.add_task(generate_project_name_task)
+    background_tasks.add_task(process_upload_background)
     
     return UploadResponse(
         task_id=task_id,
@@ -422,7 +447,7 @@ async def update_script(task_id: str, request: UpdateScriptRequest):
             # If no existing transcription, use empty list
             task_info = task_manager.get_task_info(task_id)
             transcription_data = task_info.get("transcription_data", [])
-            print(f"[UPDATE SCRIPT] Using existing transcription_data from task info")
+            print("[UPDATE SCRIPT] Using existing transcription_data from task info")
     
     # Update task info with user's exact script content and converted transcription
     task_manager.update_task_info(task_id, {
@@ -475,7 +500,6 @@ async def optimize_script(task_id: str, background_tasks: BackgroundTasks):
     # Optimize script in background
     async def optimize_script_task():
         try:
-            from backend.services.gemini_service import GeminiService
             gemini_service = GeminiService()
             
             optimized_script, transcription_data = gemini_service.optimize_script(script_content)
@@ -600,7 +624,7 @@ async def generate_video(
             # Start video generation in a thread pool to avoid blocking
             def run_video_generation():
                 try:
-                    print(f"[VIDEO GENERATION] Starting video generation in thread")
+                    print("[VIDEO GENERATION] Starting video generation in thread")
                     print(f"[VIDEO GENERATION] Transcription data length: {len(task_info.get('transcription_data', []))}")
                     
                     video_generator = VideoGenerator(progress_callback=progress_callback)
@@ -615,7 +639,7 @@ async def generate_video(
                         preset=preset,
                         voice_name=voice_name
                     )
-                    print(f"[VIDEO GENERATION] Video generation completed successfully")
+                    print("[VIDEO GENERATION] Video generation completed successfully")
                 except Exception as e:
                     error_msg = f"Video generation error in thread: {str(e)}"
                     error_traceback = traceback.format_exc()
@@ -657,10 +681,10 @@ async def generate_video(
                     break
             
             # Wait for video generation to complete
-            print(f"[VIDEO GENERATION] Waiting for video generation to complete...")
+            print("[VIDEO GENERATION] Waiting for video generation to complete...")
             try:
                 await video_future
-                print(f"[VIDEO GENERATION] Video generation task completed")
+                print("[VIDEO GENERATION] Video generation task completed")
             except Exception as e:
                 error_msg = f"Video generation task failed: {str(e)}"
                 error_traceback = traceback.format_exc()
@@ -688,7 +712,7 @@ async def generate_video(
             print("=" * 80)
             print(f"[VIDEO GENERATION FAILED] Task ID: {task_id}")
             print(f"[VIDEO GENERATION FAILED] Error: {error_msg}")
-            print(f"[VIDEO GENERATION FAILED] Full traceback:")
+            print("[VIDEO GENERATION FAILED] Full traceback:")
             print(error_traceback)
             print("=" * 80)
             

@@ -34,7 +34,7 @@ function ProgressTracker() {
 
   // Initialize WebSocket connection
   useEffect(() => {
-    if (taskId && (status === 'script_ready' || status === 'generating_video' || status === 'failed')) {
+    if (taskId && (status === 'uploading' || status === 'generating_script' || status === 'script_ready' || status === 'generating_video' || status === 'failed')) {
       const client = new WebSocketClient(
         (update) => {
           updateStatus(update);

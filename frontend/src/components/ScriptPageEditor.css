@@ -390,20 +390,6 @@
 }
 
 /* Responsive design */
-@media (max-width: 1024px) {
-  .split-editor-container {
-    grid-template-columns: 1fr;
-  }
-
-  .slide-section {
-    order: -1; /* Move slide preview on top for mobile */
-  }
-
-  .slide-preview {
-    min-height: 300px;
-  }
-}
-
 @media (max-width: 768px) {
   .editor-header {
     flex-direction: column;
@@ -429,5 +415,71 @@
 
   .page-tab {
     white-space: nowrap;
+  }
+  
+  /* Mobile: Stack layout vertically */
+  .split-editor-container {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+  
+  .slide-section {
+    order: -1; /* Move slide preview on top for mobile */
+  }
+  
+  .slide-preview {
+    min-height: 300px;
+    max-height: 400px;
+  }
+  
+  .slide-section,
+  .script-section {
+    padding: var(--spacing-md);
+  }
+}
+
+/* Tablet responsive design (768px - 1024px) */
+@media (max-width: 1024px) and (min-width: 769px) {
+  .split-editor-container {
+    gap: var(--spacing-lg);
+  }
+  
+  .slide-preview {
+    min-height: 400px;
+    max-height: 500px;
+  }
+  
+  .slide-section,
+  .script-section {
+    padding: var(--spacing-md);
+  }
+  
+  .page-selector {
+    gap: var(--spacing-sm);
+  }
+  
+  .page-tab {
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: 0.9rem;
+  }
+}
+
+/* Large tablet to small desktop (1025px - 1366px) */
+@media (max-width: 1366px) and (min-width: 1025px) {
+  .slide-preview {
+    min-height: 450px;
+    max-height: 550px;
+  }
+}
+
+/* Extra large screens (> 1920px) */
+@media (min-width: 1921px) {
+  .slide-preview {
+    min-height: 600px;
+    max-height: 800px;
+  }
+  
+  .split-editor-container {
+    min-height: 700px;
   }
 }
