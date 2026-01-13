@@ -39,29 +39,40 @@ function VideoPage() {
       </div>
 
       <div className="page-content">
-        {status === 'completed' && videoParams ? (
+        {status === 'completed' ? (
           <div className="video-params-display">
-            <h3>影片參數</h3>
-            <div className="params-grid">
-              <div className="param-item">
-                <span className="param-label">FPS（幀率）</span>
-                <span className="param-value">{videoParams.fps || 5}</span>
-              </div>
-              <div className="param-item">
-                <span className="param-label">解析度</span>
-                <span className="param-value">
-                  {videoParams.resolution_width || 1920} × {videoParams.resolution_height || 1080}
-                </span>
-              </div>
-              <div className="param-item">
-                <span className="param-label">位元率</span>
-                <span className="param-value">{videoParams.bitrate || '2000k'}</span>
-              </div>
-              <div className="param-item">
-                <span className="param-label">編碼預設</span>
-                <span className="param-value">{videoParams.preset || 'ultrafast'}</span>
-              </div>
+            <div className="completion-message">
+              <svg className="success-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <h3>影片生成完成！</h3>
+              <p>您的影片已經成功生成，可以前往下載頁面查看和下載。</p>
             </div>
+            {videoParams && (
+              <>
+                <h3 style={{ marginTop: '2rem', marginBottom: '1rem' }}>影片參數</h3>
+                <div className="params-grid">
+                  <div className="param-item">
+                    <span className="param-label">FPS（幀率）</span>
+                    <span className="param-value">{videoParams.fps || 5}</span>
+                  </div>
+                  <div className="param-item">
+                    <span className="param-label">解析度</span>
+                    <span className="param-value">
+                      {videoParams.resolution_width || 1920} × {videoParams.resolution_height || 1080}
+                    </span>
+                  </div>
+                  <div className="param-item">
+                    <span className="param-label">位元率</span>
+                    <span className="param-value">{videoParams.bitrate || '2000k'}</span>
+                  </div>
+                  <div className="param-item">
+                    <span className="param-label">編碼預設</span>
+                    <span className="param-value">{videoParams.preset || 'ultrafast'}</span>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         ) : (
           <ProgressTracker />

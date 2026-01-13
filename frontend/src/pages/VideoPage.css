@@ -7,6 +7,32 @@
   box-shadow: var(--shadow-md, 0 4px 6px rgba(0, 0, 0, 0.1));
 }
 
+.completion-message {
+  text-align: center;
+  padding: 2rem 1rem;
+}
+
+.completion-message .success-icon {
+  width: 64px;
+  height: 64px;
+  color: var(--color-success, #22c55e);
+  margin: 0 auto 1.5rem;
+  display: block;
+}
+
+.completion-message h3 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--color-text, #1f2937);
+  margin: 0 0 0.75rem 0;
+}
+
+.completion-message p {
+  font-size: 1.125rem;
+  color: var(--color-text-secondary, #6b7280);
+  margin: 0;
+}
+
 .video-params-display h3 {
   margin: 0 0 1.5rem 0;
   font-size: 1.5rem;
