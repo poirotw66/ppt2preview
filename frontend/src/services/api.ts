@@ -147,10 +147,29 @@ export const apiClient = {
   },
 
   /**
+   * Get slide images for a task
+   */
+  async getSlides(taskId: string): Promise<{
+    task_id: string;
+    slides: Array<{ page: number; filename: string; url: string }>;
+    count: number;
+  }> {
+    const response = await api.get(`/slides/${taskId}`);
+    return response.data;
+  },
+
+  /**
    * Get file URL
    */
   getFileUrl(taskId: string, filename: string): string {
     return `${API_PREFIX}/files/${taskId}/${filename}`;
+  },
+
+  /**
+   * Get slide image URL
+   */
+  getSlideUrl(taskId: string, filename: string): string {
+    return `${API_PREFIX}/files/${taskId}/slides/${filename}`;
   },
 
   /**

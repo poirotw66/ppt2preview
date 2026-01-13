@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import ScriptEditor from '@/components/ScriptEditor';
+import ScriptPageEditor from '@/components/ScriptPageEditor';
 import { useTaskStore } from '@/store/useTaskStore';
 import './PageLayout.css';
 
@@ -33,7 +33,7 @@ function OptimizeScriptPage() {
       </div>
 
       <div className="page-content">
-        <ScriptEditor showOptimizeButton={false} />
+        <ScriptPageEditor showOptimizeButton={false} />
       </div>
 
       <div className="page-footer">

@@ -773,6 +773,45 @@ async def download_video(task_id: str):
     )
 
 
+@router.get("/files/{task_id}/slides/{filename}")
+async def get_slide_image(task_id: str, filename: str):
+    """Get a slide image from task slides directory.
+    
+    Args:
+        task_id: Task identifier
+        filename: Slide image filename
+        
+    Returns:
+        Image file
+    """
+    if not task_manager.task_exists(task_id):
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    try:
+        output_task_dir = FileService.get_output_task_directory(task_id)
+        file_path = output_task_dir / "slides" / filename
+        
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail=f"Slide image not found: {filename}")
+        
+        # Determine content type
+        ext = file_path.suffix.lower()
+        content_type_map = {
+            '.png': 'image/png',
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+        }
+        content_type = content_type_map.get(ext, 'image/png')
+        
+        return FileResponse(
+            path=str(file_path),
+            media_type=content_type,
+            filename=filename
+        )
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Slide image not found: {filename}")
+
+
 @router.get("/files/{task_id}/{filename}")
 async def get_task_file(task_id: str, filename: str):
     """Get a file from task output directory.
@@ -843,6 +882,58 @@ async def list_task_files(task_id: str):
         "files": files,
         "count": len(files)
     }
+
+
+@router.get("/slides/{task_id}")
+async def get_task_slides(task_id: str):
+    """Get list of slide images for a task.
+    
+    Args:
+        task_id: Task identifier
+        
+    Returns:
+        List of slide image filenames with page numbers
+    """
+    if not task_manager.task_exists(task_id):
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    try:
+        # Get slides directory
+        output_task_dir = FileService.get_output_task_directory(task_id)
+        slides_dir = output_task_dir / "slides"
+        
+        if not slides_dir.exists():
+            return {
+                "task_id": task_id,
+                "slides": [],
+                "count": 0
+            }
+        
+        # Get all slide images
+        import re
+        slides = []
+        for file in sorted(slides_dir.iterdir()):
+            if file.suffix.lower() in ['.png', '.jpg', '.jpeg']:
+                # Extract page number from filename (e.g., page_1.png)
+                match = re.search(r'page_(\d+)', file.name)
+                if match:
+                    page_num = int(match.group(1))
+                    slides.append({
+                        "page": page_num,
+                        "filename": file.name,
+                        "url": f"/api/files/{task_id}/slides/{file.name}"
+                    })
+        
+        # Sort by page number
+        slides.sort(key=lambda x: x["page"])
+        
+        return {
+            "task_id": task_id,
+            "slides": slides,
+            "count": len(slides)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error listing slides: {str(e)}")
 
 
 @router.websocket("/ws/{task_id}")
