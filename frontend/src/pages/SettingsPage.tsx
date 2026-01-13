@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { VOICES, Voice, getAudioFileName } from '../data/voices';
 import './SettingsPage.css';
@@ -12,21 +12,40 @@ function SettingsPage() {
   const [playingVoice, setPlayingVoice] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // Cleanup: Stop audio when component unmounts or user navigates away
+  useEffect(() => {
+    return () => {
+      // Stop audio playback when component unmounts
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        audioRef.current = null;
+      }
+      setIsPlaying(false);
+      setPlayingVoice(null);
+    };
+  }, []);
+
+  const stopAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      audioRef.current = null;
+    }
+    setIsPlaying(false);
+    setPlayingVoice(null);
+  };
+
   const handleVoiceSelect = (voiceName: string) => {
     setTempVoice(voiceName);
   };
 
   const handlePreview = async (voiceName: string) => {
     // Stop current audio if playing
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
+    stopAudio();
 
     // If clicking the same voice that's playing, stop it
     if (playingVoice === voiceName && isPlaying) {
-      setIsPlaying(false);
-      setPlayingVoice(null);
       return;
     }
 
@@ -44,11 +63,13 @@ function SettingsPage() {
       audio.onended = () => {
         setIsPlaying(false);
         setPlayingVoice(null);
+        audioRef.current = null;
       };
 
       audio.onerror = (e) => {
         setIsPlaying(false);
         setPlayingVoice(null);
+        audioRef.current = null;
         console.error(`Failed to load audio for ${voiceName}:`, audioPath, e);
         alert(`無法載入音色試聽檔案：${voiceName}\n檔案路徑：${audioPath}`);
       };
@@ -58,16 +79,21 @@ function SettingsPage() {
       console.error('Error playing audio:', error);
       setIsPlaying(false);
       setPlayingVoice(null);
+      audioRef.current = null;
       alert(`播放失敗：${error}`);
     }
   };
 
   const handleSave = () => {
+    // Stop audio before navigating away
+    stopAudio();
     setVoice(tempVoice);
     navigate(-1); // Go back to previous page
   };
 
   const handleCancel = () => {
+    // Stop audio before navigating away
+    stopAudio();
     navigate(-1);
   };
 

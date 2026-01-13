@@ -1,9 +1,11 @@
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
+import { useTaskStore } from '../store/useTaskStore';
 import './LandingPage.css';
 
 function LandingPage() {
   const navigate = useNavigate();
+  const { reset } = useTaskStore();
   const [isPlaying, setIsPlaying] = useState(false);
 
   const handleWatchDemo = () => {
@@ -112,7 +114,11 @@ function LandingPage() {
           <div className="hero-actions">
             <button 
               className="cta-button primary"
-              onClick={() => navigate('/upload')}
+              onClick={() => {
+                // Reset task store to ensure a fresh start
+                reset();
+                navigate('/upload');
+              }}
             >
               <span>立即開始</span>
               <svg className="button-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -249,7 +255,11 @@ function LandingPage() {
           </p>
           <button 
             className="cta-button primary large"
-            onClick={() => navigate('/upload')}
+            onClick={() => {
+              // Reset task store to ensure a fresh start
+              reset();
+              navigate('/upload');
+            }}
           >
             <span>免費開始使用</span>
             <svg className="button-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">

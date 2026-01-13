@@ -1,23 +1,37 @@
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import FileUpload from '@/components/FileUpload';
 import { useTaskStore } from '@/store/useTaskStore';
 import './PageLayout.css';
 
 function UploadPage() {
   const navigate = useNavigate();
-  const { taskId, status } = useTaskStore();
+  const location = useLocation();
+  const { taskId, status, reset } = useTaskStore();
 
-  // Redirect if task already exists
+  // Check if we're on a task-specific route or just /upload
+  const isTaskRoute = location.pathname.includes('/task/');
+  
+  // If user navigates to /upload (not a task route), reset the store to start fresh
   useEffect(() => {
-    if (taskId) {
+    if (!isTaskRoute && taskId) {
+      // User came from landing page or directly navigated to /upload
+      // Reset to ensure a fresh start
+      reset();
+    }
+  }, [isTaskRoute, taskId, reset]);
+
+  // Redirect if task already exists (only for task-specific routes)
+  useEffect(() => {
+    // Only redirect if we're on a task-specific route and have a valid task
+    if (isTaskRoute && taskId) {
       if (status === 'script_ready') {
         navigate(`/task/${taskId}/script`);
       } else if (status && ['generating_video', 'completed'].includes(status)) {
         navigate(`/task/${taskId}/video`);
       }
     }
-  }, [taskId, status, navigate]);
+  }, [taskId, status, navigate, isTaskRoute]);
 
   return (
     <div className="page-layout">
