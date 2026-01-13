@@ -211,8 +211,8 @@ class TaskManager:
             if current_step is not None:
                 progress_obj.current_step = current_step
             
-            if error is not None:
-                progress_obj.error = error
+            # Always update error (even if None to clear previous errors)
+            progress_obj.error = error
             
             # Save state after update
             self._save_state()

@@ -68,6 +68,16 @@ function ProgressTracker() {
     if (!taskId) return;
 
     setGenerating(true);
+    
+    // Clear previous error state when starting new generation
+    updateStatus({
+      task_id: taskId,
+      status: 'script_ready', // Reset to script_ready temporarily
+      progress: 0,
+      current_step: undefined,
+      message: undefined,
+      error: undefined, // Clear error
+    });
 
     try {
       // Use current video params (from store or local)
@@ -76,14 +86,24 @@ function ProgressTracker() {
       // Save video params to store before generating
       setVideoParams(currentParams);
       
-      await apiClient.generateVideo({
+      const response = await apiClient.generateVideo({
         task_id: taskId,
         video_params: currentParams,
         voice_name: selectedVoice,
       });
+      
+      // Update status immediately with the response (should be generating_video)
+      updateStatus(response);
     } catch (err: any) {
       console.error('Failed to start video generation:', err);
-      alert(err.response?.data?.detail || '啟動影片生成失敗');
+      const errorMsg = err.response?.data?.detail || '啟動影片生成失敗';
+      updateStatus({
+        task_id: taskId,
+        status: 'failed',
+        progress: 0,
+        error: errorMsg,
+      });
+      alert(errorMsg);
       setGenerating(false);
     }
   };

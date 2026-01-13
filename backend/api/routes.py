@@ -587,12 +587,14 @@ async def generate_video(
     if not pdf_path or not Path(pdf_path).exists():
         raise HTTPException(status_code=404, detail="PDF file not found")
     
-    # Update status
+    # Update status and clear any previous errors
     await update_status_and_notify(
         task_id,
         TaskStatus.GENERATING_VIDEO,
         60.0,
-        "Generating video..."
+        "Generating video...",
+        current_step="Generating video...",
+        error=None  # Explicitly clear previous errors
     )
     
     # Video parameters
