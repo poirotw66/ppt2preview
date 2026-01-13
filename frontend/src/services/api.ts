@@ -179,6 +179,14 @@ export const apiClient = {
     const response = await api.get('/history');
     return response.data;
   },
+
+  /**
+   * Update project name
+   */
+  async updateProjectName(taskId: string, projectName: string): Promise<import('@/types').TaskStatusResponse> {
+    const response = await api.put(`/project-name/${taskId}`, { project_name: projectName });
+    return response.data;
+  },
 };
 
 export default apiClient;

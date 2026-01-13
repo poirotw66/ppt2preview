@@ -35,7 +35,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from backend.core.config import GEMINI_API_KEY, GEMINI_MODEL
-from prompt import SOLO_PRESENTATION_PROMPT, TRANSCRIPT_REWRITER_PROMPT
+from prompt import SOLO_PRESENTATION_PROMPT, TRANSCRIPT_REWRITER_PROMPT, PROJECT_NAME_GENERATOR_PROMPT
 
 
 class GeminiService:
@@ -257,3 +257,41 @@ class GeminiService:
         transcription_data = self.rewrite_transcript(script_content)
         
         return script_content, transcription_data
+    
+    def generate_project_name(self, abstract_content: str) -> str:
+        """Generate a concise project name based on abstract content.
+        
+        Args:
+            abstract_content: Content from abstract markdown file
+            
+        Returns:
+            Generated project name (within 10 characters)
+        """
+        prompt = f"""{PROJECT_NAME_GENERATOR_PROMPT}
+
+---
+
+## 簡報大綱內容
+
+{abstract_content}
+
+---
+
+請根據以上簡報大綱，生成一個簡短精準的專案名稱（10字以內）。"""
+        
+        # Generate project name
+        response = self.model.generate_content(prompt)
+        
+        # Extract text from response
+        response_text = self._get_response_text(response)
+        if not response_text:
+            raise ValueError("Failed to generate project name from Gemini: Empty response")
+        
+        # Clean up the response (remove quotes, extra spaces, newlines)
+        project_name = response_text.strip().strip('"').strip("'").strip()
+        
+        # Limit to 10 characters as safety measure
+        if len(project_name) > 10:
+            project_name = project_name[:10]
+        
+        return project_name

@@ -1,15 +1,21 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ProgressTracker from '@/components/ProgressTracker';
 import { useTaskStore } from '@/store/useTaskStore';
+import { apiClient } from '@/services/api';
+import { useToastStore } from '@/store/useToastStore';
 import { VideoParams } from '@/types';
 import './PageLayout.css';
 import './VideoPage.css';
 
 function VideoPage() {
   const navigate = useNavigate();
-  const { taskId, status, videoParams } = useTaskStore();
+  const { taskId, status, videoParams, projectName, updateStatus } = useTaskStore();
+  const { success, error: showError } = useToastStore();
   const hasCheckedRedirect = useRef(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedName, setEditedName] = useState('');
+  const [saving, setSaving] = useState(false);
 
   // Redirect only on initial load, not when status changes
   useEffect(() => {
@@ -27,6 +33,32 @@ function VideoPage() {
     }
   }, []);
 
+  const handleEditClick = () => {
+    setEditedName(projectName || '');
+    setIsEditing(true);
+  };
+
+  const handleSaveName = async () => {
+    if (!taskId || !editedName.trim()) return;
+    
+    setSaving(true);
+    try {
+      const response = await apiClient.updateProjectName(taskId, editedName.trim());
+      updateStatus(response);
+      success('專案名稱已更新');
+      setIsEditing(false);
+    } catch (err: any) {
+      showError(err.response?.data?.detail || '更新專案名稱失敗');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditedName('');
+  };
+
   if (!taskId) {
     return null;
   }
@@ -36,6 +68,48 @@ function VideoPage() {
       <div className="page-header">
         <h1>步驟 4: 生成影片</h1>
         <p>設定影片參數並開始生成，進度將即時更新</p>
+        {projectName && (
+          <div className="project-name-badge">
+            <span className="icon">✨</span>
+            <span className="label">專案名稱：</span>
+            {isEditing ? (
+              <>
+                <input
+                  type="text"
+                  className="project-name-input"
+                  value={editedName}
+                  onChange={(e) => setEditedName(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSaveName()}
+                  autoFocus
+                  maxLength={20}
+                />
+                <div className="project-name-actions">
+                  <button
+                    className="project-name-btn save"
+                    onClick={handleSaveName}
+                    disabled={saving || !editedName.trim()}
+                  >
+                    {saving ? '儲存中...' : '✓ 儲存'}
+                  </button>
+                  <button
+                    className="project-name-btn cancel"
+                    onClick={handleCancelEdit}
+                    disabled={saving}
+                  >
+                    ✕ 取消
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <span className="name">{projectName}</span>
+                <span className="edit-icon" onClick={handleEditClick} title="編輯專案名稱">
+                  ✏️
+                </span>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="page-content">

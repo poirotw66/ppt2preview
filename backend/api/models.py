@@ -72,6 +72,7 @@ class TaskStatusResponse(BaseModel):
     current_step: Optional[str] = None
     message: Optional[str] = None
     error: Optional[str] = None
+    project_name: Optional[str] = None  # AI-generated project name
 
 
 class ProgressUpdate(BaseModel):

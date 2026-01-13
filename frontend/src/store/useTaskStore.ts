@@ -17,6 +17,7 @@ interface TaskState {
   currentStep: string | null;
   message: string | null;
   error: string | null;
+  projectName: string | null;  // AI-generated project name
 
   // Script data
   scriptContent: string | null;
@@ -41,6 +42,7 @@ const initialState = {
   currentStep: null,
   message: null,
   error: null,
+  projectName: null,
   scriptContent: null,
   transcriptionData: null,
   videoParams: null,
@@ -58,6 +60,7 @@ export const useTaskStore = create<TaskState>((set) => ({
       currentStep: statusData.current_step || null,
       message: statusData.message || null,
       error: statusData.error || null,
+      projectName: statusData.project_name || null,
     }),
 
   setScript: (script) =>

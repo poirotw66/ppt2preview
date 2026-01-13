@@ -121,12 +121,14 @@ async def update_status_and_notify(
 
 @router.post("/upload", response_model=UploadResponse)
 async def upload_files(
+    background_tasks: BackgroundTasks,
     abstract_file: UploadFile = File(..., description="Abstract markdown file"),
     pdf_file: Optional[UploadFile] = File(None, description="PDF presentation file")
 ):
     """Upload abstract and PDF files for a new task.
     
     Args:
+        background_tasks: FastAPI background tasks
         abstract_file: Abstract markdown file (required)
         pdf_file: PDF presentation file (optional)
         
@@ -146,10 +148,44 @@ async def upload_files(
     task_manager.create_task(task_id, {
         "abstract_path": str(abstract_path),
         "pdf_path": str(pdf_path) if pdf_path else None,
-        "status": TaskStatus.UPLOADING
+        "status": TaskStatus.UPLOADING,
+        "project_name": None  # Will be generated in background
     })
     
     await update_status_and_notify(task_id, TaskStatus.UPLOADING, 10.0, "Files uploaded successfully")
+    
+    # Generate project name in background
+    async def generate_project_name_task():
+        try:
+            # Read abstract content
+            with open(abstract_path, 'r', encoding='utf-8') as f:
+                abstract_content = f.read()
+            
+            # Generate project name using Gemini
+            from backend.services.gemini_service import GeminiService
+            gemini_service = GeminiService()
+            project_name = gemini_service.generate_project_name(abstract_content)
+            
+            # Update task info with project name
+            task_manager.update_task_info(task_id, {
+                "project_name": project_name
+            })
+            
+            # Notify clients about the project name
+            await update_status_and_notify(
+                task_id,
+                TaskStatus.UPLOADING,
+                15.0,
+                f"專案名稱：{project_name}"
+            )
+        except Exception as e:
+            print(f"Failed to generate project name: {e}")
+            # Don't fail the upload if naming fails
+            task_manager.update_task_info(task_id, {
+                "project_name": "未命名專案"
+            })
+    
+    background_tasks.add_task(generate_project_name_task)
     
     return UploadResponse(
         task_id=task_id,
@@ -680,13 +716,18 @@ async def get_task_status(task_id: str):
         # Try to get progress (will auto-restore from disk if needed)
         progress = task_manager.get_task_progress(task_id)
         
+        # Get task info to retrieve project name
+        task_info = task_manager.get_task_info(task_id)
+        project_name = task_info.get("project_name")
+        
         return TaskStatusResponse(
             task_id=task_id,
             status=progress.status,
             progress=progress.progress,
             current_step=progress.current_step,
             message=progress.message,
-            error=progress.error
+            error=progress.error,
+            project_name=project_name
         )
     except ValueError:
         # Task not found, check if task directory exists
@@ -936,6 +977,46 @@ async def get_task_slides(task_id: str):
         raise HTTPException(status_code=500, detail=f"Error listing slides: {str(e)}")
 
 
+@router.put("/project-name/{task_id}", response_model=TaskStatusResponse)
+async def update_project_name(task_id: str, request: dict):
+    """Update project name for a task.
+    
+    Args:
+        task_id: Task identifier
+        request: Dictionary with project_name field
+        
+    Returns:
+        Updated task status response
+    """
+    if not task_manager.task_exists(task_id):
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    project_name = request.get("project_name", "").strip()
+    if not project_name:
+        raise HTTPException(status_code=400, detail="Project name cannot be empty")
+    
+    if len(project_name) > 20:
+        raise HTTPException(status_code=400, detail="Project name must be 20 characters or less")
+    
+    # Update task info with new project name
+    task_manager.update_task_info(task_id, {
+        "project_name": project_name
+    })
+    
+    # Get current progress to return
+    progress = task_manager.get_task_progress(task_id)
+    
+    return TaskStatusResponse(
+        task_id=task_id,
+        status=progress.status,
+        progress=progress.progress,
+        current_step=progress.current_step,
+        message=progress.message,
+        error=progress.error,
+        project_name=project_name
+    )
+
+
 @router.websocket("/ws/{task_id}")
 async def websocket_endpoint(websocket: WebSocket, task_id: str):
     """WebSocket endpoint for real-time progress updates.
@@ -1011,7 +1092,8 @@ async def get_history_projects():
             "modified_time": None,
             "has_script": False,
             "has_video": False,
-            "status": "unknown"
+            "status": "unknown",
+            "project_name": None
         }
         
         # Get directory creation/modification time
@@ -1040,6 +1122,8 @@ async def get_history_projects():
             task_info = task_manager.get_task_info(task_id)
             if "status" in task_info:
                 project_info["status"] = task_info["status"]
+            if "project_name" in task_info:
+                project_info["project_name"] = task_info["project_name"]
         
         projects.append(project_info)
     

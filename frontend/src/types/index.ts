@@ -58,6 +58,7 @@ export interface TaskStatusResponse {
   current_step?: string;
   message?: string;
   error?: string;
+  project_name?: string;  // AI-generated project name
 }
 
 export interface ProgressUpdate {
