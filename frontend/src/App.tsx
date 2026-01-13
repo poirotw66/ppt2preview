@@ -33,11 +33,23 @@ function TaskRouteWrapper({ children }: { children: React.ReactNode }) {
       // Set taskId in store
       setTaskId(taskId);
 
-      // If the store already has this taskId and data, no need to reload
+      // If the store already has this taskId and status, check if we need to reload
       const currentState = useTaskStore.getState();
-      if (storeTaskId === taskId && currentState.scriptContent && currentState.status) {
-        setLoading(false);
-        return;
+      // Only skip reload if we have the same taskId AND a valid status
+      // Don't skip if status is null or if we're navigating from history (need fresh data)
+      if (storeTaskId === taskId && currentState.status && 
+          currentState.status !== 'pending' && currentState.status !== 'uploading') {
+        // For completed tasks, still reload to ensure we have latest data
+        if (currentState.status === 'completed') {
+          // Still reload to get latest project_name and other updates
+        } else {
+          // For other statuses, we can skip if we have script content or status is valid
+          if (currentState.scriptContent || currentState.status === 'script_ready' || 
+              currentState.status === 'generating_video' || currentState.status === 'generating_script') {
+            setLoading(false);
+            return;
+          }
+        }
       }
 
       try {

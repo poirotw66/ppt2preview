@@ -44,15 +44,26 @@ class TaskManager:
                     self._tasks = state.get('tasks', {})
                     # Restore progress
                     for task_id, progress_data in state.get('progress', {}).items():
-                        self._progress[task_id] = TaskProgress(
-                            status=TaskStatus(progress_data['status']),
-                            progress=progress_data.get('progress', 0.0),
-                            current_step=progress_data.get('current_step'),
-                            message=progress_data.get('message'),
-                            error=progress_data.get('error')
-                        )
-            except Exception as e:
+                        try:
+                            self._progress[task_id] = TaskProgress(
+                                status=TaskStatus(progress_data['status']),
+                                progress=progress_data.get('progress', 0.0),
+                                current_step=progress_data.get('current_step'),
+                                message=progress_data.get('message'),
+                                error=progress_data.get('error')
+                            )
+                        except (KeyError, ValueError) as e:
+                            print(f"Warning: Failed to restore progress for task {task_id}: {e}")
+                            # Create default progress for this task
+                            self._progress[task_id] = TaskProgress(
+                                status=TaskStatus.PENDING,
+                                progress=0.0
+                            )
+            except (json.JSONDecodeError, IOError, Exception) as e:
                 print(f"Warning: Failed to load task state: {e}")
+                # Reset to empty state on error
+                self._tasks = {}
+                self._progress = {}
     
     def _save_state(self):
         """Save task state to disk."""
@@ -119,10 +130,22 @@ class TaskManager:
             
         Returns:
             Task information dictionary
+            
+        Raises:
+            ValueError: If task not found
         """
         with self._lock:
+            # Try to restore from disk if not in memory
             if task_id not in self._tasks:
-                raise ValueError(f"Task {task_id} not found")
+                # Check if task directory exists
+                task_dir = OUTPUT_DIR / task_id
+                if task_dir.exists():
+                    # Try to restore task
+                    self._load_state()
+                    if task_id not in self._tasks:
+                        raise ValueError(f"Task {task_id} not found")
+                else:
+                    raise ValueError(f"Task {task_id} not found")
             return self._tasks[task_id].copy()
     
     def update_task_info(self, task_id: str, updates: Dict):

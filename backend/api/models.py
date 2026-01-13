@@ -83,3 +83,8 @@ class ProgressUpdate(BaseModel):
     current_step: Optional[str] = None
     message: Optional[str] = None
 
+
+class UpdateProjectNameRequest(BaseModel):
+    """Request for updating project name."""
+    project_name: str = Field(..., min_length=1, max_length=20, description="Project name (1-20 characters)")
+

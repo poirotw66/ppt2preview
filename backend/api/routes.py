@@ -17,7 +17,8 @@ from backend.api.models import (
     GenerateVideoRequest,
     TaskStatusResponse,
     TaskStatus,
-    LengthMode
+    LengthMode,
+    UpdateProjectNameRequest,
 )
 from backend.services.file_service import FileService
 from backend.services.script_generator import ScriptGenerator
@@ -72,9 +73,14 @@ class ConnectionManager:
         if task_id not in self.active_connections:
             return
         
-        # Get project name from task info
-        task_info = task_manager.get_task_info(task_id)
-        project_name = task_info.get("project_name") if task_info else None
+        # Get project name from task info (with error handling)
+        project_name = None
+        try:
+            task_info = task_manager.get_task_info(task_id)
+            project_name = task_info.get("project_name") if task_info else None
+        except ValueError:
+            # Task not found, use None for project_name
+            pass
         
         message = {
             "task_id": task_id,
@@ -374,6 +380,12 @@ def parse_script_to_transcription(script_content: str) -> List[Tuple[str, str]]:
     current_page = None
     current_text = []
     
+    # Handle case where script starts without page marker
+    # Assign to page 1 by default
+    if lines and not re.match(r'^###\s+\[PAGE\s+\d+\]', lines[0].strip()):
+        current_page = 1
+        transcription_data.append(('頁碼', '[PAGE 1]'))
+    
     for line in lines:
         # Check for page marker: ### [PAGE X]
         page_match = re.match(r'^###\s+\[PAGE\s+(\d+)\]', line.strip())
@@ -398,6 +410,13 @@ def parse_script_to_transcription(script_content: str) -> List[Tuple[str, str]]:
     # Save last page's text
     if current_page is not None and current_text:
         text = '\n'.join(current_text).strip()
+        if text:
+            transcription_data.append(('講者', text))
+    
+    # If no pages were found but there's content, create a default page 1 entry
+    if not transcription_data and script_content.strip():
+        transcription_data.append(('頁碼', '[PAGE 1]'))
+        text = script_content.strip()
         if text:
             transcription_data.append(('講者', text))
     
@@ -1016,12 +1035,12 @@ async def get_task_slides(task_id: str):
 
 
 @router.put("/project-name/{task_id}", response_model=TaskStatusResponse)
-async def update_project_name(task_id: str, request: dict):
+async def update_project_name(task_id: str, request: UpdateProjectNameRequest):
     """Update project name for a task.
     
     Args:
         task_id: Task identifier
-        request: Dictionary with project_name field
+        request: Update project name request
         
     Returns:
         Updated task status response
@@ -1029,7 +1048,7 @@ async def update_project_name(task_id: str, request: dict):
     if not task_manager.task_exists(task_id):
         raise HTTPException(status_code=404, detail="Task not found")
     
-    project_name = request.get("project_name", "").strip()
+    project_name = request.project_name.strip()
     if not project_name:
         raise HTTPException(status_code=400, detail="Project name cannot be empty")
     
