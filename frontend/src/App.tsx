@@ -10,6 +10,8 @@ import SettingsPage from './pages/SettingsPage';
 import HistoryPage from './pages/HistoryPage';
 import { useTaskStore } from './store/useTaskStore';
 import { apiClient } from './services/api';
+import { ToastContainer } from './components/Toast';
+import { useToastStore } from './store/useToastStore';
 import { useEffect, useState } from 'react';
 import './App.css';
 
@@ -108,6 +110,7 @@ function TaskRouteWrapper({ children }: { children: React.ReactNode }) {
 function AppContent() {
   const location = useLocation();
   const hideNavigation = location.pathname === '/' || location.pathname === '/settings' || location.pathname === '/history';
+  const { toasts, removeToast } = useToastStore();
 
   return (
     <div className="app-container">
@@ -127,6 +130,7 @@ function AppContent() {
         <Route path="/video" element={<VideoPage />} />
         <Route path="/download" element={<DownloadPage />} />
       </Routes>
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </div>
   );
 }

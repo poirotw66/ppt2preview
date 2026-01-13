@@ -81,6 +81,25 @@ function ProgressTracker() {
     return <div>請先完成前面的步驟</div>;
   }
 
+  // Define video generation steps
+  const videoSteps = [
+    { id: 'parsing', label: '解析對話內容', icon: '📝', keywords: ['解析', '對話'] },
+    { id: 'converting', label: '轉換 PDF 為圖片', icon: '🖼️', keywords: ['轉換', 'PDF', '圖片', '投影片'] },
+    { id: 'generating_audio', label: '產生音訊片段', icon: '🎙️', keywords: ['音訊', '產生', 'audio', 'mp3'] },
+    { id: 'creating_clips', label: '創建影片片段', icon: '🎬', keywords: ['創建', '影片片段', 'video clip'] },
+    { id: 'concatenating', label: '合併影片片段', icon: '🔗', keywords: ['合併', 'concatenate'] },
+    { id: 'writing', label: '輸出影片檔案', icon: '💾', keywords: ['輸出', '寫入', 'write'] },
+  ];
+
+  const getCurrentStepIndex = () => {
+    if (!currentStep) return -1;
+    return videoSteps.findIndex(step => 
+      step.keywords.some(keyword => currentStep.includes(keyword))
+    );
+  };
+
+  const currentStepIndex = getCurrentStepIndex();
+
   if (status === 'generating_video') {
     return (
       <div className="progress-tracker">
@@ -97,15 +116,39 @@ function ProgressTracker() {
             />
           </div>
 
-          {currentStep && (
-            <div className="current-step">
-              <strong>目前步驟：</strong> {currentStep}
-            </div>
-          )}
+          {/* Step List */}
+          <div className="steps-list">
+            {videoSteps.map((step, index) => {
+              const isCompleted = index < currentStepIndex;
+              const isActive = index === currentStepIndex;
+              const isPending = index > currentStepIndex;
 
-          {message && (
-            <div className="progress-message">{message}</div>
-          )}
+              return (
+                <div
+                  key={step.id}
+                  className={`step-item ${isCompleted ? 'completed' : ''} ${isActive ? 'active' : ''} ${isPending ? 'pending' : ''}`}
+                >
+                  <div className="step-icon-wrapper">
+                    <div className="step-icon">{step.icon}</div>
+                    {isActive && <div className="step-spinner">⏳</div>}
+                  </div>
+                  <div className="step-content">
+                    <div className="step-label">{step.label}</div>
+                    {isActive && message && (
+                      <div className="step-message">{message}</div>
+                    )}
+                  </div>
+                  {isCompleted && (
+                    <div className="step-check">
+                      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
 
           {error && (
             <div className="error-message">

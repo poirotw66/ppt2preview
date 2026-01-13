@@ -3,40 +3,154 @@ import { useNavigate } from 'react-router-dom';
 import { apiClient } from '@/services/api';
 import { useTaskStore } from '@/store/useTaskStore';
 import { LengthMode } from '@/types';
+import { useToastStore } from '@/store/useToastStore';
 import './FileUpload.css';
 
 function FileUpload() {
   const navigate = useNavigate();
   const { taskId, setTaskId, updateStatus } = useTaskStore();
+  const { showToast, success, error: showError } = useToastStore();
   const [abstractFile, setAbstractFile] = useState<File | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDraggingAbstract, setIsDraggingAbstract] = useState(false);
+  const [isDraggingPdf, setIsDraggingPdf] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<{
+    abstract?: string;
+    pdf?: string;
+  }>({});
+
+  const validateFile = (file: File, type: 'abstract' | 'pdf'): boolean => {
+    const errors = { ...validationErrors };
+    
+    if (type === 'abstract') {
+      if (!file.name.endsWith('.md') && !file.name.endsWith('.markdown')) {
+        errors.abstract = '請上傳 Markdown 檔案 (.md 或 .markdown)';
+        setValidationErrors(errors);
+        return false;
+      } else if (file.size > 10 * 1024 * 1024) {
+        errors.abstract = '檔案大小不能超過 10MB';
+        setValidationErrors(errors);
+        return false;
+      } else {
+        delete errors.abstract;
+        setValidationErrors(errors);
+        return true;
+      }
+    } else {
+      if (!file.name.endsWith('.pdf')) {
+        errors.pdf = '請上傳 PDF 檔案';
+        setValidationErrors(errors);
+        return false;
+      } else if (file.size > 50 * 1024 * 1024) {
+        errors.pdf = '檔案大小不能超過 50MB';
+        setValidationErrors(errors);
+        return false;
+      } else {
+        delete errors.pdf;
+        setValidationErrors(errors);
+        return true;
+      }
+    }
+  };
 
   const handleAbstractFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setAbstractFile(file);
-      setError(null);
+      if (validateFile(file, 'abstract')) {
+        setAbstractFile(file);
+        setError(null);
+        success(`已選擇檔案: ${file.name}`);
+      } else {
+        showError(validationErrors.abstract || '檔案格式不正確');
+      }
     }
   };
 
   const handlePdfFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setPdfFile(file);
-      setError(null);
+      if (validateFile(file, 'pdf')) {
+        setPdfFile(file);
+        setError(null);
+        success(`已選擇 PDF: ${file.name}`);
+      } else {
+        showError(validationErrors.pdf || 'PDF 檔案格式不正確');
+      }
+    }
+  };
+
+  const handleDragEnter = (e: React.DragEvent, type: 'abstract' | 'pdf') => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (type === 'abstract') {
+      setIsDraggingAbstract(true);
+    } else {
+      setIsDraggingPdf(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent, type: 'abstract' | 'pdf') => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (type === 'abstract') {
+      setIsDraggingAbstract(false);
+    } else {
+      setIsDraggingPdf(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent, type: 'abstract' | 'pdf') => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (type === 'abstract') {
+      setIsDraggingAbstract(false);
+    } else {
+      setIsDraggingPdf(false);
+    }
+
+    const files = Array.from(e.dataTransfer.files);
+    const file = files[0];
+    
+    if (file) {
+      if (type === 'abstract') {
+        if (validateFile(file, 'abstract')) {
+          setAbstractFile(file);
+          setError(null);
+          success(`已拖放檔案: ${file.name}`);
+        } else {
+          showError(validationErrors.abstract || '檔案格式不正確');
+        }
+      } else {
+        if (validateFile(file, 'pdf')) {
+          setPdfFile(file);
+          setError(null);
+          success(`已拖放 PDF: ${file.name}`);
+        } else {
+          showError(validationErrors.pdf || 'PDF 檔案格式不正確');
+        }
+      }
     }
   };
 
   const handleUpload = async () => {
     if (!abstractFile) {
-      setError('請選擇簡報大綱檔案（Markdown）');
+      const errorMsg = '請選擇簡報大綱檔案（Markdown）';
+      setError(errorMsg);
+      showError(errorMsg);
       return;
     }
 
     setUploading(true);
     setError(null);
+    showToast('開始上傳檔案...', 'info');
 
     try {
       const response = await apiClient.uploadFiles(abstractFile, pdfFile || undefined);
@@ -47,10 +161,15 @@ function FileUpload() {
         progress: 10,
         message: response.message,
       });
+      success('檔案上傳成功！');
       // Navigate to script page with task ID
-      navigate(`/task/${response.task_id}/script`);
+      setTimeout(() => {
+        navigate(`/task/${response.task_id}/script`);
+      }, 500);
     } catch (err: any) {
-      setError(err.response?.data?.detail || '上傳失敗，請重試');
+      const errorMsg = err.response?.data?.detail || '上傳失敗，請重試';
+      setError(errorMsg);
+      showError(errorMsg);
       console.error('Upload error:', err);
     } finally {
       setUploading(false);
@@ -60,7 +179,13 @@ function FileUpload() {
   return (
     <div className="file-upload">
       <div className="upload-section">
-        <label className="file-label">
+        <label 
+          className={`file-label ${isDraggingAbstract ? 'dragging' : ''} ${validationErrors.abstract ? 'error' : ''}`}
+          onDragEnter={(e) => handleDragEnter(e, 'abstract')}
+          onDragLeave={(e) => handleDragLeave(e, 'abstract')}
+          onDragOver={handleDragOver}
+          onDrop={(e) => handleDrop(e, 'abstract')}
+        >
           <input
             type="file"
             accept=".md,.markdown"
@@ -75,7 +200,7 @@ function FileUpload() {
               簡報大綱檔案（Markdown）*
             </span>
             <span className="file-label-hint">
-              點擊或拖曳檔案至此處上傳
+              {isDraggingAbstract ? '放開以上傳' : '點擊或拖曳檔案至此處上傳'}
             </span>
           </div>
           {abstractFile && (
@@ -84,13 +209,23 @@ function FileUpload() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
               {abstractFile.name}
+              <span className="file-size">({(abstractFile.size / 1024).toFixed(1)} KB)</span>
             </span>
+          )}
+          {validationErrors.abstract && (
+            <span className="file-error">{validationErrors.abstract}</span>
           )}
         </label>
       </div>
 
       <div className="upload-section">
-        <label className="file-label">
+        <label 
+          className={`file-label ${isDraggingPdf ? 'dragging' : ''} ${validationErrors.pdf ? 'error' : ''}`}
+          onDragEnter={(e) => handleDragEnter(e, 'pdf')}
+          onDragLeave={(e) => handleDragLeave(e, 'pdf')}
+          onDragOver={handleDragOver}
+          onDrop={(e) => handleDrop(e, 'pdf')}
+        >
           <input
             type="file"
             accept=".pdf"
@@ -105,7 +240,7 @@ function FileUpload() {
               PDF 投影片檔案（選填）
             </span>
             <span className="file-label-hint">
-              點擊或拖曳檔案至此處上傳
+              {isDraggingPdf ? '放開以上傳' : '點擊或拖曳檔案至此處上傳'}
             </span>
           </div>
           {pdfFile && (
@@ -114,7 +249,11 @@ function FileUpload() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
               {pdfFile.name}
+              <span className="file-size">({(pdfFile.size / 1024 / 1024).toFixed(2)} MB)</span>
             </span>
+          )}
+          {validationErrors.pdf && (
+            <span className="file-error">{validationErrors.pdf}</span>
           )}
         </label>
       </div>

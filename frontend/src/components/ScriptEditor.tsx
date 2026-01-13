@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { apiClient } from '@/services/api';
 import { useTaskStore } from '@/store/useTaskStore';
 import { LengthMode } from '@/types';
+import { useToastStore } from '@/store/useToastStore';
 import './ScriptEditor.css';
 
 interface ScriptEditorProps {
@@ -10,6 +11,7 @@ interface ScriptEditorProps {
 
 function ScriptEditor({ showOptimizeButton = false }: ScriptEditorProps) {
   const { taskId, scriptContent, setScript, updateScriptContent, status, updateStatus } = useTaskStore();
+  const { showToast, success, error: showError } = useToastStore();
   const [lengthMode, setLengthMode] = useState<LengthMode>(LengthMode.MEDIUM);
   const [generating, setGenerating] = useState(false);
   const [optimizing, setOptimizing] = useState(false);
@@ -66,9 +68,12 @@ function ScriptEditor({ showOptimizeButton = false }: ScriptEditorProps) {
             clearInterval(pollInterval);
             await loadScript();
             setGenerating(false);
+            success('腳本生成完成！');
           } else if (statusResponse.status === 'failed') {
             clearInterval(pollInterval);
-            setError(statusResponse.error || '腳本生成失敗');
+            const errorMsg = statusResponse.error || '腳本生成失敗';
+            setError(errorMsg);
+            showError(errorMsg);
             setGenerating(false);
           }
         } catch (err) {
@@ -101,8 +106,11 @@ function ScriptEditor({ showOptimizeButton = false }: ScriptEditorProps) {
         script_content: localScript,
       });
       updateScriptContent(response.script_content);
+      success('腳本已儲存');
     } catch (err: any) {
-      setError(err.response?.data?.detail || '儲存腳本失敗');
+      const errorMsg = err.response?.data?.detail || '儲存腳本失敗';
+      setError(errorMsg);
+      showError(errorMsg);
     } finally {
       setSaving(false);
     }
@@ -127,9 +135,12 @@ function ScriptEditor({ showOptimizeButton = false }: ScriptEditorProps) {
             clearInterval(pollInterval);
             await loadScript();
             setOptimizing(false);
+            success('腳本優化完成！');
           } else if (statusResponse.status === 'failed') {
             clearInterval(pollInterval);
-            setError(statusResponse.error || '腳本優化失敗');
+            const errorMsg = statusResponse.error || '腳本優化失敗';
+            setError(errorMsg);
+            showError(errorMsg);
             setOptimizing(false);
           }
         } catch (err) {
