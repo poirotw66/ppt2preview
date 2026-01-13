@@ -260,6 +260,51 @@ def synthesize_speech(
             else:
                 print(f"[TTS ERROR] All {max_retries} attempts failed for: {output_filepath}")
                 raise
+        except google_exceptions.InvalidArgument as e:
+            # Handle sensitive content errors specially
+            error_str = str(e)
+            if "sensitive or harmful content" in error_str or "Unable to generate audio" in error_str:
+                print(f"[TTS ERROR] Sensitive content detected: {error_str[:200]}")
+                print(f"[TTS ERROR] Attempting to clean text and retry...")
+                
+                # Clean the text by removing special characters
+                import re
+                cleaned_text = re.sub(r'[^\w\s\u4e00-\u9fff\u3000-\u303f]', '', text)
+                cleaned_text = ' '.join(cleaned_text.split())  # Normalize whitespace
+                
+                if cleaned_text and cleaned_text != text:
+                    try:
+                        print(f"[TTS RETRY] Trying with cleaned text: {cleaned_text[:100]}...")
+                        client = _get_tts_client()
+                        synthesis_input = texttospeech.SynthesisInput(text=cleaned_text, prompt=prompt)
+                        voice = texttospeech.VoiceSelectionParams(
+                            language_code=language_code,
+                            name=voice_name,
+                            model_name="gemini-2.5-flash-tts"
+                        )
+                        audio_config = texttospeech.AudioConfig(
+                            audio_encoding=texttospeech.AudioEncoding.MP3
+                        )
+                        response = client.synthesize_speech(
+                            input=synthesis_input,
+                            voice=voice,
+                            audio_config=audio_config,
+                            timeout=120.0
+                        )
+                        with open(output_filepath, "wb") as out:
+                            out.write(response.audio_content)
+                        print(f"[TTS RETRY] ✓ Success with cleaned text")
+                        return output_filepath
+                    except Exception as retry_error:
+                        print(f"[TTS RETRY] Cleaned text also failed: {str(retry_error)[:100]}")
+                        # Will create silent audio in the calling function
+                        raise google_exceptions.InvalidArgument(f"Sensitive content error: {error_str}") from e
+                else:
+                    # Text is already clean or empty, raise original error
+                    raise
+            else:
+                # Other InvalidArgument errors, raise as-is
+                raise
         except Exception as e:
             # For other exceptions, don't retry
             print(f"[TTS ERROR] Unexpected error (no retry): {e}")
@@ -376,7 +421,37 @@ def _generate_audio_segment_with_order(
             print(f"[AUDIO GENERATION] Starting item {global_index} (page {page_num}): {text_preview}")
         
         style_prompt = SPEAKER_STYLES.get(speaker, SPEAKER_STYLES["講者"])
-        synthesize_speech(style_prompt, text, audio_path, language_code="cmn-tw", voice_name=voice_name)
+        
+        try:
+            synthesize_speech(style_prompt, text, audio_path, language_code="cmn-tw", voice_name=voice_name)
+        except Exception as tts_error:
+            # Check if it's a sensitive content error from Google TTS
+            error_str = str(tts_error)
+            if "sensitive or harmful content" in error_str or "Unable to generate audio" in error_str:
+                print(f"[AUDIO GENERATION] ⚠️  Sensitive content detected for item {global_index}, attempting cleanup...")
+                
+                # Try 1: Clean the text by removing special characters and punctuation
+                import re
+                cleaned_text = re.sub(r'[^\w\s一-鿿　-〿]', '', text)
+                cleaned_text = ' '.join(cleaned_text.split())  # Normalize whitespace
+                
+                if cleaned_text:
+                    try:
+                        print(f"[AUDIO GENERATION] Retry with cleaned text: {cleaned_text[:50]}...")
+                        synthesize_speech(style_prompt, cleaned_text, audio_path, language_code="cmn-tw", voice_name=voice_name)
+                        print(f"[AUDIO GENERATION] ✓ Success with cleaned text")
+                    except Exception as retry_error:
+                        # Try 2: Create silent audio as fallback
+                        print(f"[AUDIO GENERATION] Cleaned text also failed, creating silent audio...")
+                        # Don't raise, will be handled by outer exception handler
+                        raise tts_error
+                else:
+                    # Empty text after cleaning, create silent audio
+                    print(f"[AUDIO GENERATION] Text became empty after cleaning, creating silent audio...")
+                    raise tts_error
+            else:
+                # Re-raise non-sensitive-content errors
+                raise
         
         # Verify file was created and get size
         if not os.path.exists(audio_path):
@@ -401,9 +476,34 @@ def _generate_audio_segment_with_order(
     except Exception as e:
         error_msg = f"Failed to generate audio for item {global_index} (page {page_num}): {str(e)}"
         print(f"[AUDIO GENERATION ERROR] {error_msg}")
-        import traceback
-        print(f"[AUDIO GENERATION ERROR] Traceback:\n{traceback.format_exc()}")
-        raise Exception(error_msg) from e
+        
+        # Check if it's a sensitive content error
+        if "sensitive or harmful content" in str(e) or "Unable to generate audio" in str(e):
+            print(f"[AUDIO GENERATION] ⚠️  Creating silent audio as fallback for item {global_index}...")
+            try:
+                # Create a silent audio file as fallback (2 seconds)
+                from pydub import AudioSegment
+                silent_duration_ms = 2000  # 2 seconds
+                silent_audio = AudioSegment.silent(duration=silent_duration_ms)
+                silent_audio.export(audio_path, format="mp3")
+                
+                duration = silent_duration_ms / 1000.0
+                file_size = os.path.getsize(audio_path)
+                print(f"[AUDIO GENERATION] ✓ Created silent audio: {audio_filename} ({duration:.1f}s, {file_size//1024}KB)")
+                
+                if progress_callback:
+                    progress_callback(f"[{original_index + 1}/{total_items}] Skipped (sensitive content): {audio_filename}")
+                
+                return (page_num, audio_path, duration, global_index)
+            except Exception as fallback_error:
+                print(f"[AUDIO GENERATION ERROR] Failed to create silent audio: {fallback_error}")
+                # Re-raise original error if fallback also fails
+                raise Exception(error_msg) from e
+        else:
+            # For other errors, print traceback and raise
+            import traceback
+            print(f"[AUDIO GENERATION ERROR] Traceback:\n{traceback.format_exc()}")
+            raise Exception(error_msg) from e
 
 
 def process_transcription_to_audio(
@@ -573,6 +673,8 @@ def process_transcription_to_audio(
         
         print(f"[AUDIO GENERATION] Starting to process {total_tasks} tasks")
         
+        failed_tasks = []  # Track failed tasks for retry or fallback
+        
         for future in as_completed(future_to_task):
             try:
                 result = future.result()
@@ -591,21 +693,106 @@ def process_transcription_to_audio(
                 task = future_to_task[future]
                 error_msg = f"Error generating audio for item {task[5]} (global_index {task[1]}): {e}"
                 print(f"[AUDIO GENERATION ERROR] {error_msg}")
-                print(f"[AUDIO GENERATION ERROR] Traceback:\n{traceback.format_exc()}")
+                
+                # Check if it's a sensitive content error
+                error_str = str(e)
+                if "sensitive or harmful content" in error_str or "Unable to generate audio" in error_str:
+                    print(f"[AUDIO GENERATION] ⚠️  Sensitive content detected, will create silent audio as fallback")
+                    # Try to create silent audio as fallback
+                    try:
+                        page_num = task[0]
+                        global_idx = task[1]
+                        output_dir = task[4]
+                        audio_filename = f"page_{page_num}_item_{global_idx:04d}.mp3"
+                        audio_path = os.path.join(output_dir, audio_filename)
+                        
+                        from pydub import AudioSegment
+                        silent_duration_ms = 2000  # 2 seconds
+                        silent_audio = AudioSegment.silent(duration=silent_duration_ms)
+                        silent_audio.export(audio_path, format="mp3")
+                        
+                        duration = silent_duration_ms / 1000.0
+                        results[global_idx] = (page_num, audio_path, duration)
+                        completed_count += 1
+                        
+                        print(f"[AUDIO GENERATION] ✓ Created silent audio fallback: {audio_filename}")
+                        if progress_callback:
+                            progress_callback(f"Skipped (sensitive content): {audio_filename} - using silent audio")
+                    except Exception as fallback_error:
+                        print(f"[AUDIO GENERATION ERROR] Failed to create silent audio fallback: {fallback_error}")
+                        failed_tasks.append((task, error_msg))
+                else:
+                    # For other errors, log but don't fail immediately
+                    print(f"[AUDIO GENERATION ERROR] Traceback:\n{traceback.format_exc()}")
+                    failed_tasks.append((task, error_msg))
+                    if progress_callback:
+                        progress_callback(f"ERROR: {error_msg}")
+        
+        # After all tasks complete, check if we have failures
+        if failed_tasks:
+            print(f"[AUDIO GENERATION WARNING] {len(failed_tasks)} tasks failed out of {total_tasks}")
+            for task, error_msg in failed_tasks:
+                print(f"[AUDIO GENERATION WARNING] Failed task: {error_msg}")
+            
+            # If we have some results, continue with what we have
+            if len(results) > 0:
+                print(f"[AUDIO GENERATION] Continuing with {len(results)}/{total_tasks} successful audio files")
+                if progress_callback:
+                    progress_callback(f"Warning: {len(failed_tasks)} audio files failed, continuing with {len(results)} successful files")
+            else:
+                # All tasks failed, raise error
+                error_msg = f"All {total_tasks} audio generation tasks failed"
+                print(f"[AUDIO GENERATION ERROR] {error_msg}")
                 if progress_callback:
                     progress_callback(f"ERROR: {error_msg}")
-                raise
+                raise ValueError(error_msg)
         
-        # Verify all tasks completed
+        # Verify all tasks completed (or have fallbacks)
         if len(results) != total_tasks:
             missing_indices = set(range(total_tasks)) - set(results.keys())
-            error_msg = f"Not all audio files were generated. Missing indices: {sorted(missing_indices)}"
-            print(f"[AUDIO GENERATION ERROR] {error_msg}")
-            print(f"[AUDIO GENERATION ERROR] Expected {total_tasks} files, got {len(results)}")
-            print(f"[AUDIO GENERATION ERROR] Completed indices: {sorted(results.keys())}")
-            if progress_callback:
-                progress_callback(f"ERROR: {error_msg}")
-            raise ValueError(error_msg)
+            print(f"[AUDIO GENERATION WARNING] Not all audio files were generated. Missing indices: {sorted(missing_indices)}")
+            print(f"[AUDIO GENERATION WARNING] Expected {total_tasks} files, got {len(results)}")
+            print(f"[AUDIO GENERATION WARNING] Completed indices: {sorted(results.keys())}")
+            
+            # Try to create silent audio for missing indices
+            for missing_idx in missing_indices:
+                try:
+                    # Find the task for this index
+                    task = None
+                    for t in tasks:
+                        if t[1] == missing_idx:  # global_index matches
+                            task = t
+                            break
+                    
+                    if task:
+                        page_num = task[0]
+                        output_dir = task[4]
+                        audio_filename = f"page_{page_num}_item_{missing_idx:04d}.mp3"
+                        audio_path = os.path.join(output_dir, audio_filename)
+                        
+                        from pydub import AudioSegment
+                        silent_duration_ms = 2000  # 2 seconds
+                        silent_audio = AudioSegment.silent(duration=silent_duration_ms)
+                        silent_audio.export(audio_path, format="mp3")
+                        
+                        duration = silent_duration_ms / 1000.0
+                        results[missing_idx] = (page_num, audio_path, duration)
+                        print(f"[AUDIO GENERATION] ✓ Created silent audio fallback for missing index {missing_idx}")
+                except Exception as fallback_error:
+                    print(f"[AUDIO GENERATION ERROR] Failed to create fallback for index {missing_idx}: {fallback_error}")
+            
+            # Check again after creating fallbacks
+            if len(results) != total_tasks:
+                missing_indices = set(range(total_tasks)) - set(results.keys())
+                error_msg = f"Failed to generate {len(missing_indices)} audio files even with fallbacks. Missing indices: {sorted(missing_indices)}"
+                print(f"[AUDIO GENERATION ERROR] {error_msg}")
+                if progress_callback:
+                    progress_callback(f"ERROR: {error_msg}")
+                raise ValueError(error_msg)
+            else:
+                print(f"[AUDIO GENERATION] ✓ All {total_tasks} audio files ready (some are silent fallbacks)")
+                if progress_callback:
+                    progress_callback(f"✓ All {total_tasks} audio files ready (some are silent fallbacks)")
         
         # Sort by global_index to maintain order
         audio_segments = [results[idx] for idx in sorted(results.keys())]
