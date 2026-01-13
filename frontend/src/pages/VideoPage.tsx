@@ -2,11 +2,13 @@ import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ProgressTracker from '@/components/ProgressTracker';
 import { useTaskStore } from '@/store/useTaskStore';
+import { VideoParams } from '@/types';
 import './PageLayout.css';
+import './VideoPage.css';
 
 function VideoPage() {
   const navigate = useNavigate();
-  const { taskId, status } = useTaskStore();
+  const { taskId, status, videoParams } = useTaskStore();
   const hasCheckedRedirect = useRef(false);
 
   // Redirect only on initial load, not when status changes
@@ -37,7 +39,33 @@ function VideoPage() {
       </div>
 
       <div className="page-content">
-        <ProgressTracker />
+        {status === 'completed' && videoParams ? (
+          <div className="video-params-display">
+            <h3>影片參數</h3>
+            <div className="params-grid">
+              <div className="param-item">
+                <span className="param-label">FPS（幀率）</span>
+                <span className="param-value">{videoParams.fps || 5}</span>
+              </div>
+              <div className="param-item">
+                <span className="param-label">解析度</span>
+                <span className="param-value">
+                  {videoParams.resolution_width || 1920} × {videoParams.resolution_height || 1080}
+                </span>
+              </div>
+              <div className="param-item">
+                <span className="param-label">位元率</span>
+                <span className="param-value">{videoParams.bitrate || '2000k'}</span>
+              </div>
+              <div className="param-item">
+                <span className="param-label">編碼預設</span>
+                <span className="param-value">{videoParams.preset || 'ultrafast'}</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <ProgressTracker />
+        )}
       </div>
 
       <div className="page-footer">

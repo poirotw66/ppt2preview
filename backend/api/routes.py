@@ -5,7 +5,7 @@ import json
 import asyncio
 import concurrent.futures
 from pathlib import Path
-from typing import Optional, Dict
+from typing import Optional, Dict, List, Tuple
 from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, Response
 
@@ -281,9 +281,61 @@ async def get_script(task_id: str):
         )
 
 
+def parse_script_to_transcription(script_content: str) -> List[Tuple[str, str]]:
+    """Parse script.md content to transcription format without AI processing.
+    
+    Converts script.md format (with ### [PAGE X] markers) to transcription format
+    [('頁碼', '[PAGE X]'), ('講者', 'text'), ...] while preserving user's exact content.
+    
+    Args:
+        script_content: Script content in markdown format
+        
+    Returns:
+        List of (speaker, text) tuples in transcription format
+    """
+    import re
+    transcription_data = []
+    lines = script_content.split('\n')
+    current_page = None
+    current_text = []
+    
+    for line in lines:
+        # Check for page marker: ### [PAGE X]
+        page_match = re.match(r'^###\s+\[PAGE\s+(\d+)\]', line.strip())
+        if page_match:
+            # Save previous page's text if exists
+            if current_page is not None and current_text:
+                text = '\n'.join(current_text).strip()
+                if text:
+                    transcription_data.append(('講者', text))
+            
+            # Start new page
+            page_num = page_match.group(1)
+            transcription_data.append(('頁碼', f'[PAGE {page_num}]'))
+            current_page = page_num
+            current_text = []
+        else:
+            # Accumulate text for current page
+            stripped = line.strip()
+            if stripped:  # Skip empty lines
+                current_text.append(stripped)
+    
+    # Save last page's text
+    if current_page is not None and current_text:
+        text = '\n'.join(current_text).strip()
+        if text:
+            transcription_data.append(('講者', text))
+    
+    return transcription_data
+
+
 @router.put("/script/{task_id}", response_model=ScriptResponse)
 async def update_script(task_id: str, request: UpdateScriptRequest):
     """Update script content for a task.
+    
+    This endpoint saves the user-edited script content to script.md and
+    converts it to transcription.py format without AI processing, preserving
+    the user's exact content.
     
     Args:
         task_id: Task identifier
@@ -295,37 +347,43 @@ async def update_script(task_id: str, request: UpdateScriptRequest):
     if not task_manager.task_exists(task_id):
         raise HTTPException(status_code=404, detail="Task not found")
     
-    # Save to output directory only
+    # Save user-edited script content to script.md
     FileService.save_output_file(task_id, "script.md", request.script_content)
     
-    # Regenerate transcription.py from updated script using Gemini
+    # Convert script.md to transcription.py format without AI processing
+    # This preserves user's exact content while maintaining proper format
     try:
-        gemini_service = GeminiService()
-        transcription_data = gemini_service.rewrite_transcript(request.script_content)
+        transcription_data = parse_script_to_transcription(request.script_content)
         
         # Save updated transcription.py
         transcription_content = str(transcription_data)
         FileService.save_output_file(task_id, "transcription.py", transcription_content)
     except Exception as e:
-        # If transcription generation fails, try to get existing data
+        # If conversion fails, log error but still save script
+        print(f"[UPDATE SCRIPT] Failed to convert script to transcription: {e}")
+        import traceback
+        traceback.print_exc()
+        # Try to get existing transcription data as fallback
         try:
             transcription_content = FileService.get_output_file_content(task_id, "transcription.py")
             import ast
             transcription_data = ast.literal_eval(transcription_content)
-        except FileNotFoundError:
+        except (FileNotFoundError, ValueError, SyntaxError):
+            # If no existing transcription, use empty list
             task_info = task_manager.get_task_info(task_id)
             transcription_data = task_info.get("transcription_data", [])
+            print(f"[UPDATE SCRIPT] Using existing transcription_data from task info")
     
-    # Update task info
+    # Update task info with user's exact script content and converted transcription
     task_manager.update_task_info(task_id, {
-        "script_content": request.script_content,
-        "transcription_data": transcription_data
+        "script_content": request.script_content,  # User's edited content
+        "transcription_data": transcription_data    # Converted from edited script (no AI)
     })
     
     return ScriptResponse(
         task_id=task_id,
-        script_content=request.script_content,
-        transcription_data=transcription_data
+        script_content=request.script_content,  # Return exactly what user sent
+        transcription_data=transcription_data     # Return converted transcription
     )
 
 

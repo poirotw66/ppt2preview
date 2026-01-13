@@ -7,7 +7,7 @@ import { VideoParams } from '@/types';
 import './ProgressTracker.css';
 
 function ProgressTracker() {
-  const { taskId, status, progress, currentStep, message, error, updateStatus } = useTaskStore();
+  const { taskId, status, progress, currentStep, message, error, updateStatus, videoParams: storeVideoParams, setVideoParams } = useTaskStore();
   const { selectedVoice } = useSettingsStore();
   const [wsClient, setWsClient] = useState<WebSocketClient | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -19,13 +19,18 @@ function ProgressTracker() {
       console.error('Video generation failed:', error);
     }
   }, [status, error]);
-  const [videoParams, setVideoParams] = useState<VideoParams>({
+  
+  // Use store video params if available, otherwise use default local state
+  const [localVideoParams, setLocalVideoParams] = useState<VideoParams>({
     fps: 5,
     resolution_width: 1920,
     resolution_height: 1080,
     bitrate: '2000k',
     preset: 'ultrafast',
   });
+  
+  // Use store params if available, otherwise use local params
+  const videoParams = storeVideoParams || localVideoParams;
 
   // Initialize WebSocket connection
   useEffect(() => {
@@ -65,9 +70,15 @@ function ProgressTracker() {
     setGenerating(true);
 
     try {
+      // Use current video params (from store or local)
+      const currentParams = storeVideoParams || localVideoParams;
+      
+      // Save video params to store before generating
+      setVideoParams(currentParams);
+      
       await apiClient.generateVideo({
         task_id: taskId,
-        video_params: videoParams,
+        video_params: currentParams,
         voice_name: selectedVoice,
       });
     } catch (err: any) {
@@ -102,7 +113,7 @@ function ProgressTracker() {
 
   if (status === 'generating_video') {
     return (
-      <div className="progress-tracker">
+      <div className="progress-tracker generating">
         <div className="progress-section">
           <div className="progress-header">
             <h3>正在生成影片</h3>
@@ -116,35 +127,31 @@ function ProgressTracker() {
             />
           </div>
 
-          {/* Step List */}
-          <div className="steps-list">
+          {/* Current Step Message - Simplified */}
+          {currentStep && message && (
+            <div className="current-step-message">
+              <span className="step-icon">{videoSteps[currentStepIndex]?.icon || '⏳'}</span>
+              <span className="step-text">{message}</span>
+            </div>
+          )}
+
+          {/* Step List - Simplified */}
+          <div className="steps-list-compact">
             {videoSteps.map((step, index) => {
               const isCompleted = index < currentStepIndex;
               const isActive = index === currentStepIndex;
-              const isPending = index > currentStepIndex;
+
+              if (!isCompleted && !isActive) return null;
 
               return (
                 <div
                   key={step.id}
-                  className={`step-item ${isCompleted ? 'completed' : ''} ${isActive ? 'active' : ''} ${isPending ? 'pending' : ''}`}
+                  className={`step-item-compact ${isCompleted ? 'completed' : 'active'}`}
                 >
-                  <div className="step-icon-wrapper">
-                    <div className="step-icon">{step.icon}</div>
-                    {isActive && <div className="step-spinner">⏳</div>}
+                  <div className="step-icon-compact">
+                    {isCompleted ? '✓' : step.icon}
                   </div>
-                  <div className="step-content">
-                    <div className="step-label">{step.label}</div>
-                    {isActive && message && (
-                      <div className="step-message">{message}</div>
-                    )}
-                  </div>
-                  {isCompleted && (
-                    <div className="step-check">
-                      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                  )}
+                  <div className="step-label-compact">{step.label}</div>
                 </div>
               );
             })}
@@ -204,9 +211,10 @@ function ProgressTracker() {
                 min="1"
                 max="30"
                 value={videoParams.fps}
-                onChange={(e) =>
-                  setVideoParams({ ...videoParams, fps: parseInt(e.target.value) })
-                }
+                onChange={(e) => {
+                  const updated = { ...videoParams, fps: parseInt(e.target.value) };
+                  setLocalVideoParams(updated);
+                }}
               />
             </div>
 
@@ -217,12 +225,10 @@ function ProgressTracker() {
                 min="640"
                 max="3840"
                 value={videoParams.resolution_width}
-                onChange={(e) =>
-                  setVideoParams({
-                    ...videoParams,
-                    resolution_width: parseInt(e.target.value),
-                  })
-                }
+                onChange={(e) => {
+                  const updated = { ...videoParams, resolution_width: parseInt(e.target.value) };
+                  setLocalVideoParams(updated);
+                }}
               />
             </div>
 
@@ -233,12 +239,10 @@ function ProgressTracker() {
                 min="360"
                 max="2160"
                 value={videoParams.resolution_height}
-                onChange={(e) =>
-                  setVideoParams({
-                    ...videoParams,
-                    resolution_height: parseInt(e.target.value),
-                  })
-                }
+                onChange={(e) => {
+                  const updated = { ...videoParams, resolution_height: parseInt(e.target.value) };
+                  setLocalVideoParams(updated);
+                }}
               />
             </div>
 
@@ -246,9 +250,10 @@ function ProgressTracker() {
               <label>位元率</label>
               <select
                 value={videoParams.bitrate}
-                onChange={(e) =>
-                  setVideoParams({ ...videoParams, bitrate: e.target.value })
-                }
+                onChange={(e) => {
+                  const updated = { ...videoParams, bitrate: e.target.value };
+                  setLocalVideoParams(updated);
+                }}
               >
                 <option value="1000k">1000k</option>
                 <option value="2000k">2000k</option>
@@ -261,9 +266,10 @@ function ProgressTracker() {
               <label>編碼預設</label>
               <select
                 value={videoParams.preset}
-                onChange={(e) =>
-                  setVideoParams({ ...videoParams, preset: e.target.value })
-                }
+                onChange={(e) => {
+                  const updated = { ...videoParams, preset: e.target.value };
+                  setLocalVideoParams(updated);
+                }}
               >
                 <option value="ultrafast">ultrafast（最快）</option>
                 <option value="veryfast">veryfast</option>

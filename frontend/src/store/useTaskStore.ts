@@ -22,11 +22,15 @@ interface TaskState {
   scriptContent: string | null;
   transcriptionData: Array<[string, string]> | null;
 
+  // Video parameters used for generation
+  videoParams: VideoParams | null;
+
   // Actions
   setTaskId: (taskId: string | null) => void;
   updateStatus: (status: TaskStatusResponse) => void;
   setScript: (script: ScriptResponse) => void;
   updateScriptContent: (content: string) => void;
+  setVideoParams: (params: VideoParams) => void;
   reset: () => void;
 }
 
@@ -39,6 +43,7 @@ const initialState = {
   error: null,
   scriptContent: null,
   transcriptionData: null,
+  videoParams: null,
 };
 
 export const useTaskStore = create<TaskState>((set) => ({
@@ -62,6 +67,8 @@ export const useTaskStore = create<TaskState>((set) => ({
     }),
 
   updateScriptContent: (content) => set({ scriptContent: content }),
+
+  setVideoParams: (params) => set({ videoParams: params }),
 
   reset: () => set(initialState),
 }));
