@@ -143,6 +143,20 @@ async def upload_files(
     pdf_path = None
     if pdf_file:
         pdf_path = FileService.save_uploaded_file(pdf_file, task_id, "presentation.pdf")
+        
+        # Extract PDF slides immediately for preview
+        try:
+            from backend.utils.video_utils import pdf_to_images
+            output_task_dir = FileService.get_output_task_directory(task_id)
+            output_slides_dir = output_task_dir / "slides"
+            output_slides_dir.mkdir(exist_ok=True, parents=True)
+            
+            # Convert PDF to images
+            slide_images = pdf_to_images(str(pdf_path), str(output_slides_dir))
+            print(f"✓ Extracted {len(slide_images)} slides from PDF for preview")
+        except Exception as e:
+            print(f"Warning: Failed to extract PDF slides: {e}")
+            # Don't fail upload if slide extraction fails
     
     # Initialize task status
     task_manager.create_task(task_id, {

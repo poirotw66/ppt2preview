@@ -77,6 +77,7 @@ export interface HistoryProject {
   has_script: boolean;
   has_video: boolean;
   status: string;
+  project_name: string | null;
 }
 
 export interface HistoryResponse {

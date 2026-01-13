@@ -328,56 +328,7 @@ function ScriptPageEditor({ showOptimizeButton = false }: ScriptPageEditorProps)
 
       {scriptContent && scriptPages.length > 0 && (
         <div className="split-editor-container">
-          {/* Left side: Script editor */}
-          <div className="script-section">
-            <div className="editor-header">
-              <h3>編輯腳本</h3>
-              <div className="editor-actions">
-                {showOptimizeButton && (
-                  <button
-                    className="optimize-button"
-                    onClick={handleOptimizeScript}
-                    disabled={optimizing || status === 'generating_script'}
-                  >
-                    {optimizing ? '優化中...' : '✨ AI 優化腳本'}
-                  </button>
-                )}
-                <button
-                  className="save-button"
-                  onClick={handleSaveScript}
-                  disabled={saving}
-                >
-                  {saving ? '儲存中...' : '儲存變更'}
-                </button>
-              </div>
-            </div>
-
-            {/* Page selector */}
-            <div className="page-selector">
-              {scriptPages.map((page, index) => (
-                <button
-                  key={page.pageNum}
-                  className={`page-tab ${currentPage === index ? 'active' : ''}`}
-                  onClick={() => setCurrentPage(index)}
-                >
-                  第 {page.pageNum} 頁
-                </button>
-              ))}
-            </div>
-
-            {/* Current page editor */}
-            <div className="page-editor">
-              <textarea
-                className="script-textarea"
-                value={scriptPages[currentPage]?.content || ''}
-                onChange={(e) => handlePageContentChange(currentPage, e.target.value)}
-                placeholder="腳本內容..."
-                rows={20}
-              />
-            </div>
-          </div>
-
-          {/* Right side: Slide preview */}
+          {/* Left side: Slide preview */}
           <div className="slide-section">
             <div className="slide-header">
               <h3>投影片預覽</h3>
@@ -428,6 +379,55 @@ function ScriptPageEditor({ showOptimizeButton = false }: ScriptPageEditorProps)
                   })()}
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Right side: Script editor */}
+          <div className="script-section">
+            <div className="editor-header">
+              <h3>編輯腳本</h3>
+              <div className="editor-actions">
+                {showOptimizeButton && (
+                  <button
+                    className="optimize-button"
+                    onClick={handleOptimizeScript}
+                    disabled={optimizing || status === 'generating_script'}
+                  >
+                    {optimizing ? '優化中...' : '✨ AI 優化腳本'}
+                  </button>
+                )}
+                <button
+                  className="save-button"
+                  onClick={handleSaveScript}
+                  disabled={saving}
+                >
+                  {saving ? '儲存中...' : '儲存變更'}
+                </button>
+              </div>
+            </div>
+
+            {/* Page selector */}
+            <div className="page-selector">
+              {scriptPages.map((page, index) => (
+                <button
+                  key={page.pageNum}
+                  className={`page-tab ${currentPage === index ? 'active' : ''}`}
+                  onClick={() => setCurrentPage(index)}
+                >
+                  第 {page.pageNum} 頁
+                </button>
+              ))}
+            </div>
+
+            {/* Current page editor */}
+            <div className="page-editor">
+              <textarea
+                className="script-textarea"
+                value={scriptPages[currentPage]?.content || ''}
+                onChange={(e) => handlePageContentChange(currentPage, e.target.value)}
+                placeholder="腳本內容..."
+                rows={20}
+              />
             </div>
           </div>
         </div>

@@ -137,7 +137,20 @@
   min-height: 600px;
 }
 
-/* Script section (left) */
+/* Slide section (left) */
+.slide-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  border-radius: var(--radius-2xl);
+  border: none;
+  padding: var(--spacing-lg);
+  box-shadow: var(--shadow-md);
+}
+
+/* Script section (right) */
 .script-section {
   display: flex;
   flex-direction: column;
@@ -145,9 +158,9 @@
   background: var(--glass-bg);
   backdrop-filter: blur(var(--glass-blur));
   border-radius: var(--radius-2xl);
-  border: 1px solid var(--glass-border);
+  border: none;
   padding: var(--spacing-xl);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-md);
 }
 
 .editor-header {
@@ -155,7 +168,8 @@
   justify-content: space-between;
   align-items: center;
   padding-bottom: var(--spacing-md);
-  border-bottom: 2px solid var(--color-border);
+  border-bottom: none;
+  margin-bottom: var(--spacing-sm);
 }
 
 .editor-header h3 {
@@ -272,7 +286,7 @@
   box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
 }
 
-/* Slide section (right) */
+/* Slide section header */
 .slide-section {
   display: flex;
   flex-direction: column;
@@ -280,24 +294,25 @@
   background: var(--glass-bg);
   backdrop-filter: blur(var(--glass-blur));
   border-radius: var(--radius-2xl);
-  border: 1px solid var(--glass-border);
+  border: none;
   padding: var(--spacing-xl);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-md);
 }
 
 .slide-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-bottom: var(--spacing-md);
-  border-bottom: 2px solid var(--color-border);
+  padding-bottom: var(--spacing-sm);
+  border-bottom: none;
+  margin-bottom: 0;
 }
 
 .slide-header h3 {
   font-family: var(--font-heading);
   color: var(--color-text);
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   font-weight: 700;
 }
 
@@ -315,8 +330,8 @@
   justify-content: center;
   background: rgba(0, 0, 0, 0.02);
   border-radius: var(--radius-lg);
-  padding: var(--spacing-lg);
-  min-height: 400px;
+  padding: var(--spacing-sm);
+  min-height: 500px;
 }
 
 .slide-loading {
@@ -350,10 +365,10 @@
 }
 
 .slide-image {
-  max-width: 100%;
-  max-height: 100%;
+  width: 100%;
+  height: auto;
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-lg);
   object-fit: contain;
 }
 

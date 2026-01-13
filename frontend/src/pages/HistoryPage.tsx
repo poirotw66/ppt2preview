@@ -156,9 +156,11 @@ function HistoryPage() {
                   onClick={() => handleOpenProject(project.task_id, project)}
                 >
                   <div className="project-header">
-                    <div className={`project-status ${getStatusColor(project.status)}`}>
-                      {getStatusText(project.status)}
-                    </div>
+                    {project.status !== 'uploading' && (
+                      <div className={`project-status ${getStatusColor(project.status)}`}>
+                        {getStatusText(project.status)}
+                      </div>
+                    )}
                     <div className="project-icons">
                       {project.has_script && (
                         <svg className="icon-badge" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -172,6 +174,13 @@ function HistoryPage() {
                       )}
                     </div>
                   </div>
+
+                  {project.project_name && (
+                    <div className="project-name">
+                      <span className="name-icon">✨</span>
+                      <span className="name-text">{project.project_name}</span>
+                    </div>
+                  )}
 
                   <div className="project-id">
                     <span className="id-label">專案 ID:</span>
