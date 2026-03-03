@@ -96,7 +96,15 @@ class VideoGenerator:
                 if not os.path.exists(pdf_path):
                     raise FileNotFoundError(f"PDF 檔案不存在: {pdf_path}")
                 # Generate images directly in output directory
-                slide_images = pdf_to_images(pdf_path, str(output_slides_dir))
+                # Use higher DPI (200) for video generation to ensure quality
+                slide_images = pdf_to_images(
+                    pdf_path, 
+                    str(output_slides_dir),
+                    dpi=200,  # Higher DPI for video quality
+                    max_width=None,  # No size limit for video generation
+                    max_height=None,
+                    progress_callback=None
+                )
                 self._log(f"✓ 投影片圖片準備完成，共 {len(slide_images)} 頁")
             except Exception as e:
                 error_msg = f"轉換 PDF 為圖片失敗: {str(e)}"

@@ -7,7 +7,7 @@ import sys
 import time
 import traceback
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Optional, Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FutureTimeoutError
 from google.cloud import texttospeech
 from pdf2image import convert_from_path
@@ -338,33 +338,80 @@ def is_valid_image(image_path: str) -> bool:
         return False
 
 
-def pdf_to_images(pdf_path: str, output_dir: str = "slides", dpi: int = 200) -> List[str]:
+def pdf_to_images(
+    pdf_path: str, 
+    output_dir: str = "slides", 
+    dpi: int = 200,
+    max_width: Optional[int] = None,
+    max_height: Optional[int] = None,
+    progress_callback=None
+) -> List[str]:
     """Convert PDF pages to images.
     
     Args:
         pdf_path: Path to PDF file
         output_dir: Directory to save images
         dpi: DPI for image conversion (default: 200 for high quality)
+        max_width: Maximum width for resizing (optional)
+        max_height: Maximum height for resizing (optional)
+        progress_callback: Optional callback function(current, total) for progress updates
         
     Returns:
         List of image file paths in page order
     """
     Path(output_dir).mkdir(exist_ok=True)
     
+    if progress_callback:
+        progress_callback(0, "開始轉換 PDF...")
+    
+    # Convert PDF to images
     images = convert_from_path(pdf_path, dpi=dpi)
+    total_pages = len(images)
+    
+    if progress_callback:
+        progress_callback(0, f"正在處理 {total_pages} 頁...")
     
     image_paths = []
     for i, image in enumerate(images, start=1):
+        # Resize if needed
+        if max_width or max_height:
+            original_width, original_height = image.size
+            new_width, new_height = original_width, original_height
+            
+            if max_width and original_width > max_width:
+                ratio = max_width / original_width
+                new_width = max_width
+                new_height = int(original_height * ratio)
+            
+            if max_height and new_height > max_height:
+                ratio = max_height / new_height
+                new_height = max_height
+                new_width = int(new_width * ratio)
+            
+            # Ensure dimensions are even (required for video encoding)
+            new_width = new_width if new_width % 2 == 0 else new_width + 1
+            new_height = new_height if new_height % 2 == 0 else new_height + 1
+            
+            if new_width != original_width or new_height != original_height:
+                image = image.resize((new_width, new_height), PILImage.Resampling.LANCZOS)
+        
         image_path = os.path.join(output_dir, f"page_{i}.png")
-        image.save(image_path, "PNG")
+        
+        # Save with optimization for smaller file size
+        image.save(image_path, "PNG", optimize=True, compress_level=6)
+        
         if is_valid_image(image_path):
             image_paths.append(image_path)
         else:
+            # Retry with different settings
             image.save(image_path, "PNG", optimize=True)
             if is_valid_image(image_path):
                 image_paths.append(image_path)
             else:
                 raise ValueError(f"無法生成有效的圖片檔案: {image_path}")
+    
+    if progress_callback:
+        progress_callback(100, f"完成！已轉換 {total_pages} 頁")
     
     return image_paths
 

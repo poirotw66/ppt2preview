@@ -175,15 +175,24 @@ async def upload_files(
                 output_slides_dir = output_task_dir / "slides"
                 output_slides_dir.mkdir(exist_ok=True, parents=True)
                 
-                # Convert PDF to images
-                slide_images = pdf_to_images(str(pdf_path), str(output_slides_dir))
+                # Convert PDF to images with lower DPI for faster preview (100 DPI)
+                # and resize to max 1920x1080 for smaller file size
+                # This significantly speeds up processing for large PDFs
+                slide_images = pdf_to_images(
+                    str(pdf_path), 
+                    str(output_slides_dir),
+                    dpi=100,  # Lower DPI for faster conversion during upload (was 200)
+                    max_width=1920,  # Limit width for preview to reduce file size
+                    max_height=1080,  # Limit height for preview to reduce file size
+                    progress_callback=None  # Progress updates handled after completion
+                )
                 print(f"✓ Extracted {len(slide_images)} slides from PDF for preview")
                 
                 # Notify clients about slide extraction completion
                 await update_status_and_notify(
                     task_id,
                     TaskStatus.UPLOADING,
-                    12.0,
+                    15.0,
                     f"已提取 {len(slide_images)} 張投影片"
                 )
             except Exception as e:
